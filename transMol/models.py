@@ -1,12 +1,11 @@
-from typing Dict import torch
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Dict, List
 import pytorch_lightning as pl
 import copy
 from nets import Encoder, Decoder, Embedding, EncoderDecoder, Generator
-
-from uitls import subsequent_mask, make_std_mask
+from utils import subsequent_mask, make_std_mask
 from optimizers import NoamOpt
 
 import loss as loss_fn
@@ -21,13 +20,15 @@ class VAE(pl.LightningModule):
                  encoder: Encoder,
                  decoder: Decoder,
                  embedding: Embedding,
-                 generator: Generator
+                 generator: Generator,
                  training_configs = None
                  ):
 
+        super().__init__()
+
         self.encoder = encoder
         self.decoder = decoder
-        self.latent_dim = encoder.size()
+        self.latent_dim = encoder.size
 
         self.prior = torch.distributions.Normal(
             loc = self.latent_dim,
@@ -170,6 +171,15 @@ class VAE(pl.LightningModule):
         return total
 
 
+    def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
+        pad_idx = -1
+        src = x.long()
+        tgt = x.long()
+        src_mask = (src!=pad_idx).unsqueeze(-2)
+        tgt_mask = make_std_mask(tgt, pad_idx)
+        out = self.model.forward(src, tgt, src_mask, tgt_mask)
+        return out
+
 
 
     def validation_step(self, batch, batch_idx):
@@ -224,14 +234,14 @@ class VAE(pl.LightningModule):
 # factory methods
 
 
-def get_model(name: str
+def get_model(name: str,
               configs: Dict[str, object]):
 
     if name=='trans':
-        from nets import TransEncoder, TransDecoder, TransDecoderLayer, TransDecoderLayer, PosEmbedding
+        from nets import TransEncoder, TransDecoder, TransEncoderLayer, TransDecoderLayer, PosEmbedding
         hidden_dim = configs.get('hidden_dim', 128)
         ff_dim = configs.get('ff_dim', 128)
-        max_len = configs.get('max_len', 128)
+        max_len = configs.get('max_len', 100)
         vocab_size = configs.get('vocab_size', 100)
         n_heads = configs.get('n_heads', 8)
         n_encode_layers = configs.get('n_encode_layers', 6)
@@ -248,12 +258,14 @@ def get_model(name: str
 
         embedding = PosEmbedding(hidden_dim, vocab_size, max_len)
 
-        decoder_layer = DecoderLayer(
+        decoder_layer = TransDecoderLayer(
             hidden_dim,
             n_heads,
             ff_dim)
+
         decoder = TransDecoder(
             n_decode_layers,
+            max_len,
             encoder_layer,
             decoder_layer)
 
@@ -261,7 +273,6 @@ def get_model(name: str
         generator = Generator(
             hidden_dim,
             vocab_size)
-
 
         model = VAE(encoder, decoder, embedding, generator)
         return model

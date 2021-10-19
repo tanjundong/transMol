@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from typing import Dict, List
 import numpy as np
 from blocks import TransEncoderLayer, TransDecoderLayer, FeedForward
-from blocks import ConvBottleneck, DeconvBottleneck
+from blocks import ConvBottleneck, DeconvBottleneck, MeanPool
 from base import Encoder, Decoder
 from base import EncoderLayer, DecoderLayer
 
@@ -38,19 +38,21 @@ class TransEncoder(Encoder):
         self.layers = nn.ModuleList([
             copy.deepcopy(layer) for _ in range(n_layers)])
 
-        self.bottleneck = ConvBottleneck(layer.size())
-        final_dim = self.bottleneck(max_len)
+        self.bottleneck = MeanPool()
 
-        self.z_mean = nn.Linear(final_dim, layer.size)
-        self.z_var = nn.Linear(final_dim, layer.size())
+        final_dim = layer.size
+        self.z_means = nn.Linear(final_dim, final_dim)
+        self.z_var = nn.Linear(final_dim,  final_dim)
 
-        self.norm = nn.LayerNorm(layer.size())
+        self.norm = nn.LayerNorm(final_dim)
 
         self.len_prediction = nn.Sequential(
-            nn.Linear(layer.size(), layer.size()*2),
-            nn.Linear(layer.size()*2, layer.size()))
+            nn.Linear(final_dim, final_dim*2),
+            nn.Linear(final_dim*2, final_dim)
+        )
 
-        self.scale = scale
+        self.eps_scale = scale
+        self.size = layer.size
 
 
 
@@ -66,11 +68,11 @@ class TransEncoder(Encoder):
         attens = torch.cat(attens, dim=0) #[nlayer, B, L, L]
         mem = self.norm(y) #[B,L,D]
 
-        mem = mem.permute(0, 2, 1) # [B,D,L]
+        #mem = mem.permute(0, 2, 1) # [B,D,L]
         mem = self.bottleneck(mem)
         mem = mem.contiguous().view(mem.size(0), -1)
         mu, logvar = self.z_means(mem), self.z_var(mem) #[B,D]
-        mem = self.reparameterize(mu, logvar, self.eps_scale) #[B,D]
+        mem = self.reparameters(mu, logvar, self.eps_scale) #[B,D]
         pred_len = self.len_prediction(mu)
 
         return {
@@ -103,16 +105,21 @@ class TransDecoder(Decoder):
 
     def __init__(self,
                  n_layer: int,
+                 max_len: int,
                  encoder_layer : EncoderLayer,
                  layer: DecoderLayer):
         super().__init__()
-        hidden_dim = layer.size()
-        self.encoder = encoder_layer
+        hidden_dim = layer.size
+        #self.encoder = encoder_layer
         self.layers = nn.ModuleList(
             [copy.deepcopy(layer) for _ in range(n_layer)])
 
         self.norm = nn.LayerNorm(hidden_dim)
+        encoder_dim = encoder_layer.size
 
+        self.bridge = nn.Linear(encoder_dim, max_len*layer.size)
+        self.size = layer.size
+        self.max_len = max_len
         #self.linar = nn.Linear(hidden_dim, 64*9)
         #self.bottleneck = DeconvBottleneck(hidden_dim)
 
@@ -124,15 +131,22 @@ class TransDecoder(Decoder):
                tgt_mask: torch.Tensor) -> torch.Tensor:
 
         #mem = F.relu(self.linar(mem)) #[B, 576]
-        #mem = mem.view(-1, 64, 9)
+
         #mem = self.bottleneck(mem)
 
-        #mem = mem.premute(0, 2, 1) #[B, L, D]
 
-        mem, _ = self.encoder.encode(mem, src_mask)
-        mem = self.norm(mem)
+        #print(mem.shape)
+        mem = self.bridge(mem)
+        mem = mem.view(-1, self.max_len, self.size)
+
+        #mem, _ = self.encoder.forward(mem, src_mask)
+        #mem = self.norm(mem)
+        #print('xx, mem', x.shape, mem.shape)
+
+
         for layer in self.layers:
             x, _ = layer(x, mem, mem, src_mask, tgt_mask)
+
 
         return self.norm(x)
 
@@ -143,7 +157,7 @@ class EncoderDecoder(nn.Module):
                  src_embedding: nn.Module,
                  tgt_embedding: nn.Module,
                  encoder: Encoder,
-                 decoer: Decoder,
+                 decoder: Decoder,
                  generator: Generator,
                  is_inject_latent: bool=True):
         super().__init__()
@@ -175,9 +189,10 @@ class EncoderDecoder(nn.Module):
     def forward(self,
                 src: torch.Tensor,
                 tgt: torch.Tensor,
-                src_mask: torch.Tensor) -> Dict[str,torch.Tensor]:
+                src_mask: torch.Tensor,
+                tgt_mask: torch.Tensor) -> Dict[str,torch.Tensor]:
         x = self.encode(src, src_mask)
-        men = x['mem']
+        mem = x['mem']
         mu = x['mu']
         logvar = x['logvar']
 
@@ -231,7 +246,7 @@ class PosEmbedding(Embedding):
 
         pe = torch.zeros(max_len, hidden_dim) #[max_len, hidden_dim]
         pos = torch.arange(0, max_len).unsqueeze(1) #[max_len, 1]
-        div_ torch.exp(torch.arange(0, d_moddel, 2)* (-math.log(10000.0)/hidden_dim)) #[hidden_dim/2]
+        div_ = torch.exp(torch.arange(0, hidden_dim, 2)* (-math.log(10000.0)/hidden_dim)) #[hidden_dim/2]
         pe[:, 0::2] - torch.sin(pos * div_)
         pe[:, 1::2] - torch.cos(pos * div_)
         pe = pe.unsqueeze(0) #[1, max_len, hidden_dim]
@@ -250,7 +265,10 @@ class PosEmbedding(Embedding):
             x token tensor, long type
         """
         y = self.emb(x) * math.sqrt(self.hidden_dim) #[B, L, D]
-        pe = self.pe.requires_grad = False
+        self.pe.requires_grad = False
+        pe = self.pe
+        #print('y, pe', y.shape, pe.shape)
+
 
         z = y + pe[:, :x.size(1)]
         return self.dropout(z)

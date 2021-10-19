@@ -8,10 +8,10 @@ class EncoderLayer(nn.Module):
     def __init__():
         super().__init__()
 
-        self.size = 0
+        self._size = 0
 
     def size() ->int:
-        return self.size
+        return self._size
 
 
     def predict_length_from_mem(self):
@@ -22,10 +22,10 @@ class DecoderLayer(nn.Module):
 
     def __init__():
         super().__init__()
-        self.size = 0
+        self._size = 0
 
     def size() ->int:
-        return self.size
+        return self._size
 
 
 class Encoder(nn.Module):

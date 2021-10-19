@@ -22,7 +22,7 @@ def subsequent_mask(size: int) -> torch.Tensor:
 
     atten_shape = (1, size, size)
 
-    mask = np.triu(np.ones(atten_shape), k=1).astype('uint18')
+    mask = np.triu(np.ones(atten_shape), k=1).astype('uint8')
 
     return torch.from_numpy(mask) == 0
 

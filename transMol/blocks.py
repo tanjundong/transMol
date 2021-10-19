@@ -77,8 +77,6 @@ class MultiheadAttention(nn.Module):
         value = self.reshape(value)
         if mask is not None:
             if len(mask.shape)!=4:
-                print(mask.shape)
-
                 mask = mask.unsqueeze(1) #[B, 1, L, L]
 
         z, atten = attention(query, key, value, mask, self.dropout)
@@ -202,11 +200,14 @@ class TransDecoderLayer(nn.Module):
                  ff_dim: int,
                  dropout: float = 0.1):
 
+        super().__init__()
         self.src_atten = MultiheadAttention(hidden_dim, n_heads, dropout)
         self.tgt_atten = MultiheadAttention(hidden_dim, n_heads, dropout)
         self.ff = FeedForward(hidden_dim, ff_dim, dropout)
         self.residule_1 = SkipConnection(hidden_dim, dropout)
         self.residule_2 = SkipConnection(hidden_dim, dropout)
+
+        self.size = hidden_dim
 
 
     def forward(self,
@@ -293,3 +294,19 @@ class DeconvBottleneck(nn.Module):
         return x
 
 
+
+class MeanPool(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+
+
+    def forward(self,
+                x: torch.Tensor):
+
+        #B,L,D = x.shape
+        # to skip start token
+        y = torch.mean(x[:,1:,:], dim=1, keepdim=False)
+
+
+        return y
