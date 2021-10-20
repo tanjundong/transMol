@@ -94,13 +94,14 @@ class SmilesTokenizer():
 
         obj = cls()
         obj.vocab = dict()
-        for i, token in enumerate(cls.SPECIAL_TOKENS):
-            obj.vocab[token] = i
+        #for i, token in enumerate(cls.SPECIAL_TOKENS):
+        #    obj.vocab[token] = i
 
         f = open(path,'r')
         for t, line in enumerate(f.readlines()):
             line = line.strip('\n')
-            obj.vocab[t+i] = line
+            #obj.vocab[t+i] = line
+            obj.vocab[line] = t
 
         obj.init()
         f.close()
@@ -120,6 +121,8 @@ class SmilesTokenizer():
 
         if i<max_length-1:
             ret[i+1] = self.ID_EOS
+
+        return ret
 
 
     def ids2smiles(self,
