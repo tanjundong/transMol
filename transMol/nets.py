@@ -48,7 +48,8 @@ class TransEncoder(Encoder):
 
         self.len_prediction = nn.Sequential(
             nn.Linear(final_dim, final_dim*2),
-            nn.Linear(final_dim*2, final_dim)
+            nn.Linear(final_dim*2, final_dim),
+            nn.ReLU(),
         )
 
         self.eps_scale = scale

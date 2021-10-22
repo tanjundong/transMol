@@ -52,9 +52,10 @@ def smiles_bce_loss(pred: torch.Tensor,
 
     """
 
-    gt = gt.long()[:, 1:]
+    #gt = gt.long()[:, 1:]
+    gt = gt.long()
     gt = gt.contiguous().view(-1)
-    pred = pred.contiguous().view(-1, tgt.size(2))
+    pred = pred.contiguous().view(-1, pred.size(2))
 
     ce = F.cross_entropy(pred, gt, ignore_index=padding_idx, reduction='mean')
 
@@ -77,7 +78,8 @@ def len_bce_loss(pred_len: torch.Tensor,
     gt_len : torch.Tensor [B]
         gt_len
     """
-    pred_len = pred_len.contiguous().view(-1)
+    #pred_len = pred_len.contiguous().view(-1)
+    gt_len = gt_len.long()
     ce = F.cross_entropy(pred_len, gt_len, reduction='mean')
     return ce
 
@@ -100,13 +102,36 @@ def smiles_mim_loss(mean: torch.Tensor,
     p_z : torch.distributions.Normal
         p_z
     """
-
-    bs = logvar.shape[0]
-    dim = latent.shape[-1]
     z = latent
-    q_z_given_x = torch.distributions.Normal(loc=mean, scale=torch.exp(0.5*logvar))
-    y = q_z_given_x.log_prob(latent).sum(-1)
+    q_z_given_x = torch.distributions.Normal(
+        loc=mean,
+        scale=torch.exp(0.5*logvar)
+    )
+    y = q_z_given_x.log_prob(z).sum(-1)
+    #print(y.sum(-1))
     y += p_z.log_prob(z).sum(-1)
+    #x = torch.sum(
+    #    q_z_given_x.log_prob(z).sum(-1) +
+    #    p_z.log_prob(z).sum(-1))
+    return -0.5*y
 
-    return -0.5*torch.sum(y)
+def compute_kernel(x, y):
+    x_size = x.shape[0]
+    y_size = y.shape[0]
+    dim = x.shape[1]
 
+    tiled_x = x.view(x_size,1,dim).repeat(1, y_size,1)
+    tiled_y = y.view(1,y_size,dim).repeat(x_size, 1,1)
+
+    return torch.exp(-torch.mean((tiled_x - tiled_y)**2,dim=2)/dim*1.0)
+
+
+def compute_mmd(x, y):
+    x_kernel = compute_kernel(x, x)
+    y_kernel = compute_kernel(y, y)
+    xy_kernel = compute_kernel(x, y)
+    return torch.mean(x_kernel) + torch.mean(y_kernel) - 2*torch.mean(xy_kernel)
+
+def loss_mmd(mean :torch.Tensor):
+    true_sample = torch.randn_like(mean)
+    return compute_mmd(true_sample, mean)

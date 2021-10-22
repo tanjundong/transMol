@@ -134,6 +134,7 @@ class SkipConnection(nn.Module):
                 x: torch.Tensor,
                 y: torch.Tensor):
         z = x + self.dropout(self.norm(y))
+        #z = self.dropout(self.norm(y))
         return z
 
 
@@ -188,6 +189,8 @@ class TransEncoderLayer(nn.Module):
         z = self.ff(y)
 
         z = self.residule_2(y, z)
+
+        #w = self.ff(z)
         return z, atten
 
 
@@ -221,7 +224,10 @@ class TransDecoderLayer(nn.Module):
         y = self.residule_1(x, y)
 
         z, tgt_att = self.tgt_atten(y, mem_key, mem_val, tgt_mask)
+        z = self.ff(z)
         z = self.residule_2(y, z)
+
+
         return z, src_att
 
 
