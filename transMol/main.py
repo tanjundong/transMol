@@ -6,27 +6,30 @@ from pytorch_lightning.loggers import WandbLogger
 import wandb
 from tokenizer import SmilesTokenizer
 
+tokenizer = SmilesTokenizer.load('./a.vocab')
 configs = {
     'hidden_dim': 128,
     'ff_dim': 128,
     'max_len': 80,
     'vocab_size': 100,
     'n_heads': 8,
-    'n_encode_layers': 3,
+    'n_encode_layers': 4,
     'n_decode_layers': 2,
-    'batch_size': 16*16*12,
+    'batch_size': 16*16*8,
 }
+configs['vocab_size'] = tokenizer.size
 
 wandb.init(config=configs)
 configs = wandb.config
 
-tokenizer = SmilesTokenizer.load('./a.vocab')
+
 
 model = get_model('trans', configs)
 
 data_model = SmilesDataMudule(
     tokenizer,
-    '../data/train',
+    '/data/dataset/pubsmiles/train',
+    #'../data/train',
     '../data/val',
     configs['batch_size'],
     configs['max_len'])

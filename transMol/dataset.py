@@ -17,34 +17,55 @@ class AutoRegressionDataset(Dataset):
         self.tokenizer = tokenizer
         self.path = path
         self.is_train = is_train
-        self.max_len = max_len
+        self.max_len = max_len+1
 
         self.data = []
-
+        self.smiles = []
         self.init()
 
     def init(self):
 
+        tmp = []
         with open(self.path, 'r') as f:
-            for line in f.readlines():
+            for i,line in enumerate(f.readlines()):
                 line = line.strip('\n')
-                ids = self.tokenizer.smiles2ids(line, self.max_len)
-                np_ids = np.array(ids, dtype=np.int32)
-                self.data.append(torch.from_numpy(np_ids).long())
+                #ids = self.tokenizer.smiles2ids(line, self.max_len)
+                self.smiles.append(line)
+                #if i%10000==0:
+                #    print('processed lines ', i)
+                #tmp.append(ids)
+                #np_ids = np.array(ids, dtype=np.int32)
+                #self.data.append(torch.from_numpy(np_ids).long())
+        print('start tokenizing')
+
+        for s in self.smiles:
+            ids = self.tokenizer.smiles2ids(s, self.max_len)
+            l = len(s)
+            l = min([l, self.max_len])
+            self.data.append(ids[:l+2])
 
 
     def __len__(self):
-        return len(self.data)
+        return len(self.smiles)
 
 
 
     def __getitem__(self, idx):
-        x = self.data[idx]
+
+        ids = self.data[idx]
+        l = len(ids)
+        x = torch.zeros(self.max_len).long()
+        x[0:l] = torch.LongTensor(ids)
+        #smiles = self.smiles[idx]
+        #ids = self.tokenizer.smiles2ids(smiles, self.max_len)
+        #x = torch.LongTensor(ids)
 
         y = x.clone()
-        y = torch.roll(y, -1, dims=-1)
+        y = y[1: ]
+        x = x[:-1]
+        #y = torch.roll(y, -1, dims=-1)
         #y = y[:-1] + [0]
-
+        #print(x.shape, y.shape)
         return x, y
 
 
@@ -69,10 +90,10 @@ class SmilesDataMudule(pl.LightningDataModule):
 
 
     def train_dataloader(self):
-        return DataLoader(self.trainset, batch_size=self.batch_size, shuffle=True, num_workers=24)
+        return DataLoader(self.trainset, batch_size=self.batch_size, shuffle=True, num_workers=4)
 
     def val_dataloader(self):
-        return DataLoader(self.validset, batch_size=self.batch_size, shuffle=False, num_workers=12)
+        return DataLoader(self.validset, batch_size=self.batch_size, shuffle=False, num_workers=4)
 
 
 

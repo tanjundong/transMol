@@ -10,6 +10,7 @@ from utils import subsequent_mask, make_std_mask
 from optimizers import NoamOpt
 
 import loss as loss_fn
+import metrics
 
 class VAE(pl.LightningModule):
     """VAE.
@@ -167,7 +168,10 @@ class VAE(pl.LightningModule):
             'loss_bce': loss_bce,
             'loss_length': loss_length,
             'out': out,
+            'src': src,
+            'tgt': tgt,
         }
+
 
 
     def training_step(self, batch, batch_idx):
@@ -188,7 +192,8 @@ class VAE(pl.LightningModule):
         self.log('train/loss_length', loss_length, on_step=True)
 
 
-        total = loss_a_mim + loss_bce + loss_length
+        total = loss_a_mim + loss_bce + 0.1*loss_length
+
         self.log('train/loss', total, on_step=True)
 
         return total
@@ -213,10 +218,11 @@ class VAE(pl.LightningModule):
         loss_bce = batch_parts['loss_bce']
         loss_length = batch_parts['loss_length']
         loss_a_mim = batch_parts['loss_a_mim']
-
+        #print(loss_bce)
         loss_a_mim = torch.mean(loss_a_mim)
         loss_bce = torch.mean(loss_bce)
         loss_length = torch.mean(loss_length)
+
 
         self.log('val/loss_a_mim', loss_a_mim, on_step=True)
         self.log('val/loss_bce', loss_bce, on_step=True)
@@ -225,6 +231,16 @@ class VAE(pl.LightningModule):
 
         total = loss_a_mim + loss_bce + loss_length
         self.log('val/loss', total, on_step=True)
+
+        tgt = batch_parts['tgt'] #[2xB,L]
+        #print('tgt',tgt.shape)
+
+        #tgt = torch.cat(tgt, dim=0) #[2xB, L]
+        out = batch_parts['out']
+        #print(out)
+        logit = out['logit']
+        smiles_acc = metrics.smiles_reconstruct_accuracy(logit, tgt)
+        self.log('val/smiles_ac', smiles_acc)
         return total
 
 
