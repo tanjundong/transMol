@@ -60,7 +60,7 @@ def attention(q: torch.Tensor,
         score = score.masked_fill(mask==0, -1e9)
 
     p_atten = F.softmax(score, dim=-1) #[B, H, L, L]
-    z = F.dropout(p_atten)
+    z = F.dropout(p_atten, dropout)
     y = torch.matmul(z, v) # [B, H, L, K]
 
     return y, p_atten

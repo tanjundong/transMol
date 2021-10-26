@@ -11,6 +11,7 @@ class AutoRegressionDataset(Dataset):
                  path: str,
                  tokenizer: SmilesTokenizer,
                  is_train=True,
+                 is_denoising = True,
                  max_len=100):
         super().__init__()
 
@@ -18,6 +19,7 @@ class AutoRegressionDataset(Dataset):
         self.path = path
         self.is_train = is_train
         self.max_len = max_len+1
+        self.is_denoising = is_denoising
 
         self.data = []
         self.smiles = []
@@ -48,6 +50,11 @@ class AutoRegressionDataset(Dataset):
     def __len__(self):
         return len(self.smiles)
 
+    def get_noise_mask(self, l):
+        p = 0.15
+        ret = torch.FloatTensor(self.max_len).uniform_()<p
+        ret[l:] = False
+        return ret
 
 
     def __getitem__(self, idx):
@@ -61,8 +68,14 @@ class AutoRegressionDataset(Dataset):
         #x = torch.LongTensor(ids)
 
         y = x.clone()
-        y = y[1: ]
+
+
+        if self.is_denoising:
+            m = self.get_noise_mask(l)
+            x.masked_fill_(m, SmilesTokenizer.ID_MASK)
         x = x[:-1]
+        y = y[1: ]
+
         #y = torch.roll(y, -1, dims=-1)
         #y = y[:-1] + [0]
         #print(x.shape, y.shape)
@@ -85,8 +98,8 @@ class SmilesDataMudule(pl.LightningDataModule):
         self.val_path = val_path
 
     def setup(self, stage=None):
-        self.trainset = AutoRegressionDataset(self.train_path, self.tokenizer, True, self.max_len)
-        self.validset = AutoRegressionDataset(self.val_path, self.tokenizer, False, self.max_len)
+        self.trainset = AutoRegressionDataset(self.train_path, self.tokenizer, True, True, self.max_len)
+        self.validset = AutoRegressionDataset(self.val_path, self.tokenizer, False, True, self.max_len)
 
 
     def train_dataloader(self):

@@ -145,8 +145,9 @@ class VAE(pl.LightningModule):
         tgt = tgt.long()
         src_mask = (src!=pad_idx).unsqueeze(-2)
         tgt_mask = make_std_mask(tgt, pad_idx)
-        out = self.model.forward(src, tgt, src_mask, tgt_mask)
+        out = self.model.forward(src, src, src_mask, tgt_mask)
         true_len = src_mask.sum(dim=-1).squeeze(-1)
+
 
         logit = out['logit']
         mem = out['mem']
@@ -201,8 +202,8 @@ class VAE(pl.LightningModule):
 
     def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
         pad_idx = 0
-        src = x.long()
-        tgt = x.long()
+        src = x[:-1].long()
+        tgt = x[1: ].long()
         src_mask = (src!=pad_idx).unsqueeze(-2)
         tgt_mask = make_std_mask(tgt, pad_idx)
         out = self.model.forward(src, tgt, src_mask, tgt_mask)
