@@ -54,6 +54,7 @@ class TransEncoder(Encoder):
 
         self.eps_scale = scale
         self.size = layer.size
+        self.max_len = max_len
 
 
 

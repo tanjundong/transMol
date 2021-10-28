@@ -25,6 +25,21 @@ class VAE(pl.LightningModule):
                  generator: Generator,
                  training_configs = None
                  ):
+        """__init__.
+
+        Parameters
+        ----------
+        encoder : Encoder
+            encoder
+        decoder : Decoder
+            decoder
+        embedding : Embedding
+            embedding
+        generator : Generator
+            generator
+        training_configs :
+            training_configs
+        """
 
         super().__init__()
 
@@ -49,6 +64,8 @@ class VAE(pl.LightningModule):
         self.src_embedding = embedding
         self.tgt_embedding = copy.deepcopy(embedding)
 
+
+        # build model
         self.model = EncoderDecoder(
             self.src_embedding,
             self.tgt_embedding,
@@ -91,30 +108,42 @@ class VAE(pl.LightningModule):
         mu = out['mu']
         logvar = out['logvar']
         pred_len = out['pred_len']
-        return mem, mu, logvar, pred_len, out
+        return  mu, logvar, mem, pred_len, out
 
 
     def predict_length(self, mu: torch.Tensor):
 
-        return 0
+        #return 0
+        encoder = self.model.encoder
+        y = encoder.len_prediction(mu)
+        return torch.argmax(y).detach().cpu().item()
+
 
     def greedy_decode(self, mu: torch.Tensor,
                       src_mask: torch.Tensor):
 
         self.model.eval()
+
+
+        decoded = torch.ones(mu.shape[0], 1).fill_(1).long()
         if src_mask is None:
             pass
-
-        decoded = torch.ones(mu.shape[0], 1).fill_(0).long()
         length = self.predict_length(mu)
-        tgt = torch.ones(mu.shape[0], length+1).fill_(0).long()
+        #tgt = torch.ones(mu.shape[0], length+1).fill_(0).long()
+        max_len = self.model.encoder.max_len
+        tgt = torch.ones(mu.shape[0], self.model.encoder.max_len).fill_(1).long()
+
 
         with torch.no_grad():
             for i in range(length):
-                decode_mask = subsequent_mask(decoded.size(1)).long()
-                out = self.model.decode(mu, src_mask,
-                                        decoded,
+                #decode_mask = subsequent_mask(decoded.size(1)).long()
+                decode_mask = subsequent_mask(self.model.encoder.max_len).long()
+                #decode_mask[:,i+1:, :] = False
+                #print(decode_mask)
+                #print(tgt.shape, mu.shape, src_mask.shape, decode_mask.shape)
+                out = self.model.decode(tgt, mu, src_mask,
                                         decode_mask)
+
 
                 out = self.model.generator(out)
                 prob = F.softmax(out[:, i, :], dim=-1)
@@ -124,6 +153,9 @@ class VAE(pl.LightningModule):
 
                 next_word = next_word.unsqueeze(1)
                 decoded = torch.cat([decoded, next_word], dim=1)
+                decoded = decoded.long()
+                if i>=max_len-2:
+                    break
 
         z = tgt[:,1:]
         return z
@@ -142,10 +174,11 @@ class VAE(pl.LightningModule):
         src, tgt = batch #[B,L], [B,L]
         pad_idx = 0
         src = src.long()
-        tgt = tgt.long()
+        src2 = src.clone()
+        src2.requires_grad = False
         src_mask = (src!=pad_idx).unsqueeze(-2)
         tgt_mask = make_std_mask(tgt, pad_idx)
-        out = self.model.forward(src, src, src_mask, tgt_mask)
+        out = self.model.forward(src, src2, src_mask, tgt_mask)
         true_len = src_mask.sum(dim=-1).squeeze(-1)
 
 
@@ -270,6 +303,32 @@ class VAE(pl.LightningModule):
 
 
         #return optimizers
+
+
+    def load(self, path):
+        ckpt = torch.load(path)
+        state_dict = ckpt['state_dict']
+        self.load_state_dict(state_dict)
+
+
+    def sample_neighbor(self, src: torch.Tensor, n: int):
+        mask = (src!=0).unsqueeze(-2)  #[B,1,L]
+        mu, logvar, mean, pred_len, out = self.encode(src, mask)
+        pred_len = torch.argmax(pred_len, dim=-1)
+        pred_len = pred_len.item()
+        ret = []
+        #print(src)
+        for i in range(n):
+            z = mu + torch.randn(self.latent_dim)
+            #print(z[0,0:2])
+            z = mean
+            token = self.greedy_decode(z, mask)[-1]
+
+            ret.append(token.detach().cpu().numpy().tolist())
+
+        return ret
+
+
 
 
 

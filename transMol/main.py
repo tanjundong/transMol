@@ -8,7 +8,7 @@ from tokenizer import SmilesTokenizer
 
 tokenizer = SmilesTokenizer.load('./a.vocab')
 configs = {
-    'hidden_dim': 128,
+    'hidden_dim': 256,
     'ff_dim': 128,
     'max_len': 80,
     'vocab_size': 100,

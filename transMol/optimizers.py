@@ -50,3 +50,56 @@ class AdamOpt:
 
     def load_state_dict(self, state_dict):
         self.state_dict = state_dict
+
+
+
+class WarmupLRScheduler(torch.optim.lr_scheduler._LRScheduler):
+        """
+        Warmup learning rate until `total_steps`
+
+        Args:
+            optimizer (Optimizer): wrapped optimizer.
+            configs (DictConfig): configuration set.
+        """
+        def __init__(
+                self,
+                model_size,
+                factor,
+                warmup,
+                optimizer,
+        ) -> None:
+            warmup_steps = 2
+            peak_lr = 0.1
+            self.init_lr = 0.001
+            warmup_steps = 2
+
+            if warmup_steps != 0:
+                warmup_rate = peak_lr - self.init_lr
+                self.warmup_rate = warmup_rate / warmup_steps
+            else:
+                self.warmup_rate = 0
+            self.update_steps = 1
+            self.lr = self.init_lr
+            self.warmup_steps = 2
+            super().__init__(optimizer)
+
+        def set_lr(self, optimizer, lr):
+            for pg in optimizer.param_groups:
+                pg["lr"] = lr
+
+        def step(self, val_loss = None):
+            #print(self.lr)
+            if self.update_steps < self.warmup_steps:
+                lr = self.init_lr + self.warmup_rate * self.update_steps
+                self.set_lr(self.optimizer, lr)
+                self.lr = lr
+            self.update_steps += 1
+            return self.lr
+
+        def rate(self, step=None):
+            "Implement 'lrate' above"
+            if step is None:
+                step = self.step
+            return self.factor * (self.model_size ** (-0.5) * min(step ** (-0.5), step * self.warmup ** (-1.5)))
+
+

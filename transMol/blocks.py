@@ -220,10 +220,10 @@ class TransDecoderLayer(nn.Module):
                 src_mask: torch.Tensor,
                 tgt_mask: torch.Tensor) -> [torch.Tensor, torch.Tensor]:
 
-        y, src_att = self.src_atten(x, x, x, src_mask)
+        y, src_att = self.src_atten(x, x, x, tgt_mask)
         y = self.residule_1(x, y)
 
-        z, tgt_att = self.tgt_atten(y, mem_key, mem_val, tgt_mask)
+        z, tgt_att = self.tgt_atten(y, mem_key, mem_val, src_mask)
         z = self.ff(z)
         z = self.residule_2(y, z)
 

@@ -11,6 +11,15 @@ def smiles_reconstruct_accuracy(
 
     Parameters
     ----------
+    logit : torch.Tensor
+        logit
+    gt : torch.Tensor
+        gt
+    """
+    """smiles_reconstruct_accuracy.
+
+    Parameters
+    ----------
     logit : torch.Tensor [B,L,D]
         logit
     gt : torch.Tensor [B,L]
