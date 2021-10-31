@@ -146,7 +146,7 @@ class TransDecoder(Decoder):
         #mem = self.norm(mem)
         #print('xx, mem', x.shape, mem.shape)
 
-        mem, _ = self.encoder_layer(mem, src_mask)
+        #mem, _ = self.encoder_layer(mem, src_mask)
         mem = self.norm(mem)
 
         for layer in self.layers:

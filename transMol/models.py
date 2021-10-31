@@ -295,7 +295,7 @@ class VAE(pl.LightningModule):
         self.log('val/loss_length', loss_length, on_step=True)
 
 
-        total = loss_a_mim + loss_bce + loss_length
+        total = loss_a_mim + loss_bce + 0*loss_length
         self.log('val/loss', total, on_step=True)
 
         tgt = batch_parts['tgt'] #[2xB,L]

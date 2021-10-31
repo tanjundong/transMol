@@ -75,7 +75,8 @@ class AutoRegressionDataset(Dataset):
             x.masked_fill_(m, SmilesTokenizer.ID_MASK)
 
         #x = x[1:]
-        x = x[:-1]
+        #x = x[:-1]
+        x = x[1: ]
         y = y[1: ]
 
         #y = torch.roll(y, -1, dims=-1)
