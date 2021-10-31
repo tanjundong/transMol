@@ -18,7 +18,7 @@ class AutoRegressionDataset(Dataset):
         self.tokenizer = tokenizer
         self.path = path
         self.is_train = is_train
-        self.max_len = max_len+1
+        self.max_len = max_len
         self.is_denoising = is_denoising
 
         self.data = []
@@ -76,8 +76,8 @@ class AutoRegressionDataset(Dataset):
 
         #x = x[1:]
         #x = x[:-1]
-        x = x[1: ]
-        y = y[1: ]
+        #x = x[1: ]
+        #y = y[1: ]
 
         #y = torch.roll(y, -1, dims=-1)
         #y = y[:-1] + [0]

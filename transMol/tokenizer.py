@@ -113,14 +113,14 @@ class SmilesTokenizer():
                    smiles: str,
                    max_length: int):
         ret = [self.ID_PAD] * max_length
-        ret[0] = self.ID_SOS
+        #ret[0] = self.ID_SOS
         for i, char in enumerate(smiles):
-            i = i+1
-            if i<max_length -1:
+            #i = i+1
+            if i<max_length:
                 ret[i] = self.char2id(char)
 
-        if i<max_length-1:
-            ret[i+1] = self.ID_EOS
+        #if i<max_length-1:
+        #    ret[i+1] = self.ID_EOS
 
         return ret
 
