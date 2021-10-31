@@ -201,7 +201,7 @@ class VAE(pl.LightningModule):
         src_mask.requires_grad = False
         tgt_mask = make_std_mask(tgt, pad_idx)
         tgt_mask.requires_grad = False
-        out = self.model.forward(src, y, src_mask, tgt_mask)
+        out = self.model.forward(src, tgt, src_mask, tgt_mask)
         true_len = src_mask.sum(dim=-1).squeeze(-1)
 
 
@@ -215,7 +215,7 @@ class VAE(pl.LightningModule):
         #loss_a_mim = loss_fn.smiles_mim_loss(mu, logvar, mem, self.get_prior())
         #loss_a_mim = loss_fn.loss_mmd(mu)
         loss_a_mim = loss_fn.KL_loss(mu, logvar, 0.5)
-        loss_bce = loss_fn.smiles_bce_loss(logit, tgt, pad_idx)
+        loss_bce = loss_fn.smiles_bce_loss(logit, y, pad_idx)
         #print(pred_len.shape, true_len.shape)
 
         loss_length = loss_fn.len_bce_loss(pred_len,  true_len)
