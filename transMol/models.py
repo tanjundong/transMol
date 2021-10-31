@@ -180,7 +180,7 @@ class VAE(pl.LightningModule):
                 #if i>=max_len-2:
                 #    break
 
-        z = tgt[:,1:]
+        z = tgt
         return z
 
 
@@ -316,13 +316,14 @@ class VAE(pl.LightningModule):
 
 
         #print(a, self.tgt_embedding)
-        print('*'*20)
+        print(' ')
         c = torch.ones_like(a)
         c[:, 0:3] =  a[:, 0:3]
         ret = self.sample_neighbor(a, 2, None)
         b = a[0].cpu().numpy().tolist()
         smiles = tokenizer.ids2smiles(b)
-        print('origin smiles', smiles)
+        print('origin smiles')
+        print(smiles)
         for b in ret:
             s = tokenizer.ids2smiles(b)
             print(s)
