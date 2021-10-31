@@ -144,7 +144,8 @@ class VAE(pl.LightningModule):
             decoded = decoded.cuda()
             decode_mask = decode_mask.cuda()
             tgt = tgt.cuda()
-            prefix = prefix.cuda()
+            if prefix is not None:
+                prefix = prefix.cuda()
 
         if prefix is not None:
             idx = prefix>0
