@@ -110,7 +110,7 @@ class SmilesDataMudule(pl.LightningDataModule):
         return DataLoader(self.trainset, batch_size=self.batch_size, shuffle=True, num_workers=4)
 
     def val_dataloader(self):
-        return DataLoader(self.validset, batch_size=self.batch_size, shuffle=False, num_workers=4)
+        return DataLoader(self.validset, batch_size=self.batch_size, shuffle=True, num_workers=4)
 
 
 

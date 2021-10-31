@@ -138,16 +138,22 @@ class TransDecoder(Decoder):
         #mem = self.bottleneck(mem)
 
 
+
+
         #print(mem.shape)
         mem = self.bridge(mem)
-        mem = mem.view(-1, self.max_len, self.size)
+        mem = mem.view(-1, self.max_len, self.size) #[B,L,D]
 
-        #mem, _ = self.encoder.forward(mem, src_mask)
+        mem, _ = self.encoder_layer(mem, src_mask)
+
         #mem = self.norm(mem)
         #print('xx, mem', x.shape, mem.shape)
 
-        #mem, _ = self.encoder_layer(mem, src_mask)
+
         mem = self.norm(mem)
+
+        if isinstance(self.layers[0], GPTDecoderLayer):
+            x = mem
 
         for layer in self.layers:
             x, _ = layer(x, mem, mem, src_mask, tgt_mask)

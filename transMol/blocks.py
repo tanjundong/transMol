@@ -288,10 +288,10 @@ class GPTDecoderLayer(DecoderLayer):
                 tgt_mask: torch.Tensor):
 
             #q = self.ln1(x)a
-            _x = mem_key
-            _t = self.ln1(_x)
+            #_x = mem_key
+            _t = self.ln1(x)
             y, atten = self.atten(_t, _t, _t, None)
-            x = _x + y
+            x = x + y
             x = x + self.mlp(self.ln2(x))
             return x, atten
 
