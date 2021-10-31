@@ -151,7 +151,7 @@ class VAE(pl.LightningModule):
             idx = prefix>0
             tgt[idx] = prefix
             tgt[:,0] = 1
-
+        #loss_length = 2
         with torch.no_grad():
             for i in range(length):
                 decode_mask = subsequent_mask(decoded.size(1)).long()
@@ -169,14 +169,16 @@ class VAE(pl.LightningModule):
                 #prob = F.softmax(out[:, i, :], dim=-1)
                 #_, next_word = torch.max(prob, dim=1)
                 idx = torch.argmax(out, dim=-1)
-                next_word = idx[:, i]
-                tgt[:, i+1] = next_word
+                tgt = idx
+                #return idx
+                #next_word = idx[:, i]
+                #tgt[:, i+1] = next_word
 
-                next_word = next_word.unsqueeze(1)
-                decoded = torch.cat([decoded, next_word], dim=1)
-                decoded = decoded.long()
-                if i>=max_len-2:
-                    break
+                #next_word = next_word.unsqueeze(1)
+                #decoded = torch.cat([decoded, next_word], dim=1)
+                #decoded = decoded.long()
+                #if i>=max_len-2:
+                #    break
 
         z = tgt[:,1:]
         return z
@@ -196,12 +198,13 @@ class VAE(pl.LightningModule):
         pad_idx = 0
         src = Variable(src.long())
         tgt = Variable(src.clone())
+        tgt[:, 1:] = 1
         #src2.requires_grad = False
         src_mask = (src!=pad_idx).unsqueeze(-2)
         src_mask.requires_grad = False
         tgt_mask = make_std_mask(tgt, pad_idx)
         tgt_mask.requires_grad = False
-        out = self.model.forward(src, y, src_mask, tgt_mask)
+        out = self.model.forward(src, tgt, src_mask, tgt_mask)
         true_len = src_mask.sum(dim=-1).squeeze(-1)
 
 
@@ -215,7 +218,7 @@ class VAE(pl.LightningModule):
         #loss_a_mim = loss_fn.smiles_mim_loss(mu, logvar, mem, self.get_prior())
         #loss_a_mim = loss_fn.loss_mmd(mu)
         loss_a_mim = loss_fn.KL_loss(mu, logvar, 0.5)
-        loss_bce = loss_fn.smiles_bce_loss(logit, tgt, pad_idx)
+        loss_bce = loss_fn.smiles_bce_loss(logit, y, pad_idx)
         #print(pred_len.shape, true_len.shape)
 
         loss_length = loss_fn.len_bce_loss(pred_len,  true_len)
@@ -249,7 +252,7 @@ class VAE(pl.LightningModule):
         self.log('train/loss_length', loss_length, on_step=True)
 
 
-        total = loss_a_mim + loss_bce + loss_length
+        total = loss_a_mim + loss_bce + 0*loss_length
 
         self.log('train/loss', total, on_step=True)
 
@@ -394,7 +397,7 @@ def get_model(name: str,
               configs: Dict[str, object]):
 
     if name=='trans':
-        from nets import TransEncoder, TransDecoder, TransEncoderLayer, TransDecoderLayer, PosEmbedding
+        from nets import TransEncoder, TransDecoder, TransEncoderLayer, TransDecoderLayer, PosEmbedding, GPTDecoderLayer
         hidden_dim = configs.get('hidden_dim', 128)
         ff_dim = configs.get('ff_dim', 128)
         max_len = configs.get('max_len', 100)
@@ -414,10 +417,16 @@ def get_model(name: str,
 
         embedding = PosEmbedding(hidden_dim, vocab_size, max_len)
 
-        decoder_layer = TransDecoderLayer(
+        #decoder_layer = TransDecoderLayer(
+        #    hidden_dim,
+        #    n_heads,
+        #    ff_dim)
+
+        decoder_layer = GPTDecoderLayer(
             hidden_dim,
             n_heads,
             ff_dim)
+
 
         decoder = TransDecoder(
             n_decode_layers,

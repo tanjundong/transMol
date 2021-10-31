@@ -20,12 +20,25 @@ class EncoderLayer(nn.Module):
 
 class DecoderLayer(nn.Module):
 
-    def __init__():
+    def __init__(self,
+                 hidden_dim: int,
+                 n_heads: int,
+                 ff_dim: int,
+                 dropout: float):
         super().__init__()
         self._size = 0
 
     def size() ->int:
         return self._size
+
+    def forward(self,
+                x: torch.Tensor,
+                mem_key: torch.Tensor,
+                mem_val: torch.Tensor,
+                src_mask: torch.Tensor,
+                tgt_mask: torch.Tensor) -> [torch.Tensor, torch.Tensor]:
+        pass
+
 
 
 class Encoder(nn.Module):
