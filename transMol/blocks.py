@@ -10,14 +10,14 @@ from utils import attention
 
 _BOTTLENECK_KERNEL_SIZE = 9
 _BOTTLENECK_CHANNEL = 64
-
+_DROPOUT = 0.2
 class MultiheadAttention(nn.Module):
 
 
     def __init__(self,
                  hidden_dim: int,
                  n_heads: int,
-                 dropout: float = 0.1):
+                 dropout: float = _DROPOUT):
 
         super().__init__()
         assert hidden_dim % n_heads == 0
@@ -125,7 +125,7 @@ class SkipConnection(nn.Module):
 
     def __init__(self,
                  dim: int,
-                 dropout: float=0.1):
+                 dropout: float=_DROPOUT):
         super().__init__()
         self.norm = nn.LayerNorm(dim)
         self.dropout = nn.Dropout(dropout)
@@ -144,7 +144,7 @@ class TransEncoderLayer(nn.Module):
                  hidden_dim: int,
                  n_heads: int,
                  ff_dim: int,
-                 dropout: float=0.1):
+                 dropout: float=_DROPOUT):
         super().__init__()
 
         assert hidden_dim % n_heads == 0
@@ -158,6 +158,7 @@ class TransEncoderLayer(nn.Module):
         self.size = hidden_dim
         self.n_heads = n_heads
         self.ff_dim = ff_dim
+        self.norm = nn.LayerNorm(hidden_dim)
 
 
 
@@ -182,13 +183,14 @@ class TransEncoderLayer(nn.Module):
 
         B, L, D = x.shape
 
-        y, atten = self.self_attention_1(x, x, x, mask)
+        y, atten = self.self_attention_1(self.norm(x), self.norm(x), self.norm(x), mask)
+        #y = x + self.norm(y)
 
-        y = self.residule_1(x, y)
+        #y = self.residule_1(x, y)
 
-        z = self.ff(y)
-
-        z = self.residule_2(y, z)
+        z = self.ff(self.norm(y))
+        #z = z + y
+        #z = self.residule_2(y, z)
 
         #w = self.ff(z)
         return z, atten
@@ -201,16 +203,18 @@ class TransDecoderLayer(nn.Module):
                  hidden_dim: int,
                  n_heads: int,
                  ff_dim: int,
-                 dropout: float = 0.1):
+                 dropout: float = _DROPOUT):
 
         super().__init__()
         self.src_atten = MultiheadAttention(hidden_dim, n_heads, dropout)
-        self.tgt_atten = MultiheadAttention(hidden_dim, n_heads, dropout)
+        self.self_atten = MultiheadAttention(hidden_dim, n_heads, dropout)
         self.ff = FeedForward(hidden_dim, ff_dim, dropout)
         self.residule_1 = SkipConnection(hidden_dim, dropout)
         self.residule_2 = SkipConnection(hidden_dim, dropout)
+        self.norm = nn.LayerNorm(hidden_dim)
 
         self.size = hidden_dim
+        self.dropout = nn.Dropout(dropout)
 
 
     def forward(self,
@@ -220,15 +224,28 @@ class TransDecoderLayer(nn.Module):
                 src_mask: torch.Tensor,
                 tgt_mask: torch.Tensor) -> [torch.Tensor, torch.Tensor]:
 
-        y, src_att = self.src_atten(x, x, x, tgt_mask)
-        y = self.residule_1(x, y)
+        x = self.norm(x)
+        y, _ = self.self_atten(x, x, x, tgt_mask)
+        #y = x + self.dropout(y)
 
-        z, tgt_att = self.tgt_atten(y, mem_key, mem_val, src_mask)
-        z = self.ff(z)
-        z = self.residule_2(y, z)
+        z, src_att = self.src_atten(self.norm(y), mem_key, mem_val, src_mask)
+        #z = y + self.dropout(z)
+
+        w = self.ff(self.norm(z))
+
+        return w, src_att
 
 
-        return z, src_att
+
+
+        #y = self.residule_1(x, y)
+
+        #z, tgt_att = self.tgt_atten(y, mem_key, mem_val, src_mask)
+        #z = self.ff(z)
+        #z = self.residule_2(y, z)
+
+
+        #return z, src_att
 
 
 

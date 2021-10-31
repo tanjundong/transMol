@@ -84,6 +84,7 @@ class TransEncoder(Encoder):
             'pred_len': pred_len,
             'atten': attens,
         }
+        #return (mu, logvar, mem, pred_len, atten)
 
 
 
@@ -112,7 +113,7 @@ class TransDecoder(Decoder):
                  layer: DecoderLayer):
         super().__init__()
         hidden_dim = layer.size
-        #self.encoder = encoder_layer
+        self.encoder_layer = encoder_layer
         self.layers = nn.ModuleList(
             [copy.deepcopy(layer) for _ in range(n_layer)])
 
@@ -145,6 +146,8 @@ class TransDecoder(Decoder):
         #mem = self.norm(mem)
         #print('xx, mem', x.shape, mem.shape)
 
+        mem, _ = self.encoder_layer(mem, src_mask)
+        mem = self.norm(mem)
 
         for layer in self.layers:
             x, _ = layer(x, mem, mem, src_mask, tgt_mask)
@@ -194,11 +197,13 @@ class EncoderDecoder(nn.Module):
                 src_mask: torch.Tensor,
                 tgt_mask: torch.Tensor) -> Dict[str,torch.Tensor]:
         x = self.encode(src, src_mask)
-        mem = x['mem']
+        #mu, logvar, mem, pred_len, atten = x
         mu = x['mu']
         logvar = x['logvar']
-
+        mem = x['mem']
         pred_len = x['pred_len']
+        atten = x['atten']
+
         x = self.decode(tgt, mem, src_mask, tgt_mask)  #[B,L,D]
         x = self.generator(x) #[B,L,vocab_size]
 
@@ -207,6 +212,7 @@ class EncoderDecoder(nn.Module):
                 'mu': mu,
                 'logvar': logvar,
                 'pred_len': pred_len}
+        #return (x, mu, logvar, mem, pred_len)
 
 
 

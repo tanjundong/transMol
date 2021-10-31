@@ -73,6 +73,8 @@ class AutoRegressionDataset(Dataset):
         if self.is_denoising:
             m = self.get_noise_mask(l)
             x.masked_fill_(m, SmilesTokenizer.ID_MASK)
+
+        #x = x[1:]
         x = x[:-1]
         y = y[1: ]
 
@@ -98,8 +100,9 @@ class SmilesDataMudule(pl.LightningDataModule):
         self.val_path = val_path
 
     def setup(self, stage=None):
-        self.trainset = AutoRegressionDataset(self.train_path, self.tokenizer, True, True, self.max_len)
-        self.validset = AutoRegressionDataset(self.val_path, self.tokenizer, False, True, self.max_len)
+
+        self.trainset = AutoRegressionDataset(self.train_path, self.tokenizer, True, False, self.max_len)
+        self.validset = AutoRegressionDataset(self.val_path, self.tokenizer, False, False, self.max_len)
 
 
     def train_dataloader(self):

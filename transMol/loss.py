@@ -53,13 +53,14 @@ def smiles_bce_loss(pred: torch.Tensor,
     """
 
     #gt = gt.long()[:, 1:]
-    gt = gt.long()
+    gt = gt.long().detach()
     gt = gt.contiguous().view(-1)
     pred = pred.contiguous().view(-1, pred.size(2))
-    idx = gt!=padding_idx
-    gt = gt[idx]
-    pred= pred[idx]
-    ce = F.cross_entropy(pred, gt, ignore_index=padding_idx, reduction='mean')
+    #idx = gt!=padding_idx
+    #gt = gt[idx]
+    #pred= pred[idx]
+    #ce = F.cross_entropy(pred, gt, ignore_index=padding_idx, reduction='mean')
+    ce = F.cross_entropy(pred, gt, reduction='mean')
 
     return ce
 

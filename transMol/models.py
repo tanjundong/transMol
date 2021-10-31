@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
+from torch.autograd import Variable
 import torch.nn.functional as F
 from typing import Dict, List
 import pytorch_lightning as pl
@@ -11,6 +12,7 @@ from optimizers import NoamOpt
 
 import loss as loss_fn
 import metrics
+from tokenizer import SmilesTokenizer
 
 class VAE(pl.LightningModule):
     """VAE.
@@ -61,14 +63,14 @@ class VAE(pl.LightningModule):
         #self.register_buffer('prior', prior)
 
         # embeddings
-        self.src_embedding = embedding
-        self.tgt_embedding = copy.deepcopy(embedding)
+        src_embedding = embedding
+        tgt_embedding = copy.deepcopy(embedding)
 
 
         # build model
         self.model = EncoderDecoder(
-            self.src_embedding,
-            self.tgt_embedding,
+            src_embedding,
+            tgt_embedding,
             encoder,
             decoder,
             generator,
@@ -120,7 +122,9 @@ class VAE(pl.LightningModule):
 
 
     def greedy_decode(self, mu: torch.Tensor,
-                      src_mask: torch.Tensor):
+                      src_mask: torch.Tensor,
+                      prefix : torch.Tensor=None,
+                      is_gpu=True):
 
         self.model.eval()
 
@@ -131,24 +135,40 @@ class VAE(pl.LightningModule):
         length = self.predict_length(mu)
         #tgt = torch.ones(mu.shape[0], length+1).fill_(0).long()
         max_len = self.model.encoder.max_len
-        tgt = torch.ones(mu.shape[0], self.model.encoder.max_len).fill_(1).long()
+        tgt = torch.ones(mu.shape[0], self.model.encoder.max_len).fill_(3).long()
 
+
+        decode_mask = subsequent_mask(max_len).long()
+
+        if is_gpu:
+            decoded = decoded.cuda()
+            decode_mask = decode_mask.cuda()
+            tgt = tgt.cuda()
+            prefix = prefix.cuda()
+
+        if prefix is not None:
+            idx = prefix>0
+            tgt[idx] = prefix
+            tgt[:,0] = 1
 
         with torch.no_grad():
             for i in range(length):
-                #decode_mask = subsequent_mask(decoded.size(1)).long()
-                decode_mask = subsequent_mask(self.model.encoder.max_len).long()
+                decode_mask = subsequent_mask(decoded.size(1)).long()
+                if is_gpu:
+                    decode_mask = decode_mask.cuda()
+
                 #decode_mask[:,i+1:, :] = False
                 #print(decode_mask)
                 #print(tgt.shape, mu.shape, src_mask.shape, decode_mask.shape)
-                out = self.model.decode(tgt, mu, src_mask,
+                out = self.model.decode(decoded, mu, src_mask,
                                         decode_mask)
 
 
-                out = self.model.generator(out)
-                prob = F.softmax(out[:, i, :], dim=-1)
-                _, next_word = torch.max(prob, dim=1)
-
+                out = self.model.generator(out) #[B,L,vocab]
+                #prob = F.softmax(out[:, i, :], dim=-1)
+                #_, next_word = torch.max(prob, dim=1)
+                idx = torch.argmax(out, dim=-1)
+                next_word = idx[:, i]
                 tgt[:, i+1] = next_word
 
                 next_word = next_word.unsqueeze(1)
@@ -171,14 +191,16 @@ class VAE(pl.LightningModule):
     def on_step(self, batch, batch_idx, is_training):
         if is_training:
             self.train()
-        src, tgt = batch #[B,L], [B,L]
+        src, y = batch #[B,L], [B,L]
         pad_idx = 0
-        src = src.long()
-        src2 = src.clone()
-        src2.requires_grad = False
+        src = Variable(src.long())
+        tgt = Variable(src.clone())
+        #src2.requires_grad = False
         src_mask = (src!=pad_idx).unsqueeze(-2)
+        src_mask.requires_grad = False
         tgt_mask = make_std_mask(tgt, pad_idx)
-        out = self.model.forward(src, src2, src_mask, tgt_mask)
+        tgt_mask.requires_grad = False
+        out = self.model.forward(src, y, src_mask, tgt_mask)
         true_len = src_mask.sum(dim=-1).squeeze(-1)
 
 
@@ -187,11 +209,11 @@ class VAE(pl.LightningModule):
         mu = out['mu']
         logvar = out['logvar']
         pred_len = out['pred_len'] #[B,D]
+        #logit, mu, mem, logvar, pred_len = out
 
         #loss_a_mim = loss_fn.smiles_mim_loss(mu, logvar, mem, self.get_prior())
-        loss_a_mim = loss_fn.loss_mmd(mu)
-        #loss_a_mim = loss_fn.KL_loss(mu, logvar, 0.5)
-
+        #loss_a_mim = loss_fn.loss_mmd(mu)
+        loss_a_mim = loss_fn.KL_loss(mu, logvar, 0.5)
         loss_bce = loss_fn.smiles_bce_loss(logit, tgt, pad_idx)
         #print(pred_len.shape, true_len.shape)
 
@@ -226,7 +248,7 @@ class VAE(pl.LightningModule):
         self.log('train/loss_length', loss_length, on_step=True)
 
 
-        total = loss_a_mim + loss_bce + 0.1*loss_length
+        total = loss_a_mim + loss_bce + loss_length
 
         self.log('train/loss', total, on_step=True)
 
@@ -235,8 +257,8 @@ class VAE(pl.LightningModule):
 
     def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
         pad_idx = 0
-        src = x[:-1].long()
-        tgt = x[1: ].long()
+        src = x.long()
+        tgt = src
         src_mask = (src!=pad_idx).unsqueeze(-2)
         tgt_mask = make_std_mask(tgt, pad_idx)
         out = self.model.forward(src, tgt, src_mask, tgt_mask)
@@ -245,6 +267,12 @@ class VAE(pl.LightningModule):
 
 
     def validation_step(self, batch, batch_idx):
+
+        #token = tokenizer.smiles2ids(smiles, self.model.encoder.max_len)
+        #a = torch.LongTensor(token).unsqueeze(0).cuda()
+        #src, tgt = batch
+
+
         return self.on_step(batch, batch_idx, False)
 
 
@@ -275,6 +303,29 @@ class VAE(pl.LightningModule):
         logit = out['logit']
         smiles_acc = metrics.smiles_reconstruct_accuracy(logit, tgt)
         self.log('val/smiles_ac', smiles_acc)
+
+        tokenizer = SmilesTokenizer.load('./a.vocab')
+        src = batch_parts['src']
+        a = src[0].unsqueeze(0).detach()
+
+        #self.cuda()
+
+
+        #print(a, self.tgt_embedding)
+        print('*'*20)
+        c = torch.ones_like(a)
+        c[:, 0:3] =  a[:, 0:3]
+        ret = self.sample_neighbor(a, 2, None)
+        b = a[0].cpu().numpy().tolist()
+        smiles = tokenizer.ids2smiles(b)
+        print('origin smiles', smiles)
+        for b in ret:
+            s = tokenizer.ids2smiles(b)
+            print(s)
+
+        print('='*20)
+
+
         return total
 
 
@@ -294,7 +345,7 @@ class VAE(pl.LightningModule):
             lr = configs.get('lr')
             warmup = configs.get('warmup_steps')
 
-        opt = torch.optim.Adam(self.parameters(), lr=1e-4, betas=(0.9, 0.98), eps=1e-9)
+        opt = torch.optim.AdamW(self.parameters(), lr=1e-4, betas=(0.9, 0.98), eps=1e-9)
 
 
         return opt
@@ -311,7 +362,7 @@ class VAE(pl.LightningModule):
         self.load_state_dict(state_dict)
 
 
-    def sample_neighbor(self, src: torch.Tensor, n: int):
+    def sample_neighbor(self, src: torch.Tensor, n: int, prefix = None):
         mask = (src!=0).unsqueeze(-2)  #[B,1,L]
         mu, logvar, mean, pred_len, out = self.encode(src, mask)
         pred_len = torch.argmax(pred_len, dim=-1)
@@ -319,10 +370,10 @@ class VAE(pl.LightningModule):
         ret = []
         #print(src)
         for i in range(n):
-            z = mu + torch.randn(self.latent_dim)
+            #z = mu + torch.randn(self.latent_dim).cuda()
             #print(z[0,0:2])
             z = mean
-            token = self.greedy_decode(z, mask)[-1]
+            token = self.greedy_decode(z, mask, prefix)[-1]
 
             ret.append(token.detach().cpu().numpy().tolist())
 

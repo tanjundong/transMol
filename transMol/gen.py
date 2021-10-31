@@ -31,6 +31,7 @@ smiles = sys.argv[-1]
 token = tokenizer.smiles2ids(smiles, configs['max_len'])
 
 a = torch.LongTensor(token).unsqueeze(0)
+#a = torch.roll(a, -1, -1)
 
 ret = model.sample_neighbor(a, 10)
 for b in ret:
