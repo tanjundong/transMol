@@ -198,7 +198,7 @@ class VAE(pl.LightningModule):
         pad_idx = 0
         src = Variable(src.long())
         tgt = Variable(src.clone())
-        tgt[:, 1:] = 1
+        #tgt[:, 1:] = 1
         #src2.requires_grad = False
         src_mask = (src!=pad_idx).unsqueeze(-2)
         src_mask.requires_grad = False
@@ -306,7 +306,7 @@ class VAE(pl.LightningModule):
         #print(out)
         logit = out['logit']
         smiles_acc = metrics.smiles_reconstruct_accuracy(logit, tgt)
-        self.log('val/smiles_ac', smiles_acc)
+        self.log('val/smiles_ac', smiles_acc, on_step=True)
 
         tokenizer = SmilesTokenizer.load('./a.vocab')
         src = batch_parts['src']
