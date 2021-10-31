@@ -7,6 +7,7 @@ from typing import Dict, List
 import copy
 
 from utils import attention
+from base import DecoderLayer
 
 _BOTTLENECK_KERNEL_SIZE = 9
 _BOTTLENECK_CHANNEL = 64
@@ -198,7 +199,7 @@ class TransEncoderLayer(nn.Module):
 
 
 
-class TransDecoderLayer(nn.Module):
+class TransDecoderLayer(DecoderLayer):
 
     def __init__(self,
                  hidden_dim: int,
@@ -206,7 +207,13 @@ class TransDecoderLayer(nn.Module):
                  ff_dim: int,
                  dropout: float = _DROPOUT):
 
-        super().__init__()
+        #super().__init__()
+        super().__init__(
+            hidden_dim,
+            n_heads,
+            ff_dim,
+            dropout,
+        )
         self.src_atten = MultiheadAttention(hidden_dim, n_heads, dropout)
         self.self_atten = MultiheadAttention(hidden_dim, n_heads, dropout)
         self.ff = FeedForward(hidden_dim, ff_dim, dropout)
@@ -247,6 +254,51 @@ class TransDecoderLayer(nn.Module):
 
 
         #return z, src_att
+
+class GPTDecoderLayer(DecoderLayer):
+
+    def __init__(self,
+                 hidden_dim: int,
+                 n_heads: int,
+                 ff_dim: int,
+                 dropout: float = _DROPOUT):
+        super().__init__(
+            hidden_dim,
+            n_heads,
+            ff_dim,
+            dropout,
+        )
+        self.ln1 = nn.LayerNorm(hidden_dim)
+        self.size = hidden_dim
+        self.ln2 = nn.LayerNorm(hidden_dim)
+        self.atten = MultiheadAttention(hidden_dim, n_heads, dropout)
+        _dim = hidden_dim*4
+        self.mlp = nn.Sequential(
+            nn.Linear(hidden_dim, _dim),
+            nn.GELU(),
+            nn.Linear(_dim, hidden_dim),
+            nn.Dropout(dropout))
+
+
+    def forward(self,
+                x: torch.Tensor,
+                mem_key: torch.Tensor,
+                mem_val: torch.Tensor,
+                src_mask: torch.Tensor,
+                tgt_mask: torch.Tensor):
+
+            #q = self.ln1(x)a
+            _x = mem_key
+            _t = self.ln1(_x)
+            y, atten = self.atten(_t, _t, _t, None)
+            x = _x + y
+            x = x + self.mlp(self.ln2(x))
+            return x, atten
+
+
+
+
+
 
 
 

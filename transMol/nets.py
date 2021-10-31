@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Dict, List
 import numpy as np
-from blocks import TransEncoderLayer, TransDecoderLayer, FeedForward
+from blocks import TransEncoderLayer, TransDecoderLayer, FeedForward, GPTDecoderLayer
 from blocks import ConvBottleneck, DeconvBottleneck, MeanPool
 from base import Encoder, Decoder
 from base import EncoderLayer, DecoderLayer
