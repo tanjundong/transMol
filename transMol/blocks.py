@@ -150,17 +150,14 @@ class TransEncoderLayer(nn.Module):
         super().__init__()
 
         assert hidden_dim % n_heads == 0
-        self.self_attention_1 = MultiheadAttention(hidden_dim, n_heads, dropout)
-        self.residule_1 = SkipConnection(hidden_dim, dropout)
-
-        #self.self_attention_2 = nn.MultiheadAttention(hidden_dim, n_heads, dropout)
-        self.residule_2 = SkipConnection(hidden_dim, dropout)
+        self.atten = MultiheadAttention(hidden_dim, n_heads, dropout)
 
         self.ff = FeedForward(hidden_dim, ff_dim, dropout)
         self.size = hidden_dim
         self.n_heads = n_heads
         self.ff_dim = ff_dim
-        self.norm = nn.LayerNorm(hidden_dim)
+        self.ln1 = nn.LayerNorm(hidden_dim)
+        self.ln2 = nn.LayerNorm(hidden_dim)
 
 
 
@@ -185,16 +182,17 @@ class TransEncoderLayer(nn.Module):
 
         B, L, D = x.shape
 
-        y, atten = self.self_attention_1(self.norm(x), self.norm(x), self.norm(x), mask)
-        #y = x + self.norm(y)
+        _t = self.ln1(x)
+        y, atten = self.atten(_t, _t, _t, None)
+        x = x + y
+        x = x + self.ff(self.ln2(x))
+        return x, atten
 
-        #y = self.residule_1(x, y)
 
-        z = self.ff(self.norm(y))
-        #z = z + y
-        #z = self.residule_2(y, z)
 
-        #w = self.ff(z)
+
+
+
         return z, atten
 
 
@@ -240,6 +238,12 @@ class TransDecoderLayer(DecoderLayer):
         #z = y + self.dropout(z)
 
         w = self.ff(self.norm(z))
+        _t = self.ln1(x)
+        y, atten = self.atten(_t, _t, _t, None)
+        x = x + y
+        x = x + self.mlp(self.ln2(x))
+        return x, atten
+
 
         return w, src_att
 
