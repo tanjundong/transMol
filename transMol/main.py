@@ -8,13 +8,13 @@ from tokenizer import SmilesTokenizer
 from torch.utils.tensorboard import SummaryWriter
 
 tokenizer = SmilesTokenizer.load('./a.vocab')
-gpus = 4
+gpus = 8
 configs = {
     'hidden_dim': 768,
     'ff_dim': 512,
     'max_len': 80,
     'vocab_size': 100,
-    'n_heads': 4,
+    'n_heads': 8,
     'n_encode_layers': 6,
     'n_decode_layers': 6,
     'batch_size': 16*16*2*gpus,
@@ -57,6 +57,7 @@ trainer = pl.Trainer(
     accelerator='dp',
     log_every_n_steps=2,
     gradient_clip_val=0.25,
+    resume_from_checkpoint = './transMol-transMol/wp2rav54/checkpoints/epoch=65-step=41051.ckpt',
 )
 
 trainer.fit(model, data_model)
