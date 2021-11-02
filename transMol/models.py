@@ -366,7 +366,7 @@ class VAE(pl.LightningModule):
         scheduler = {
             'scheduler': scheduler,
             'interval': 'step', # or 'epoch'
-            'frequency: 1
+            'frequency': 1
         }
 
         return [opt], [scheduler]
