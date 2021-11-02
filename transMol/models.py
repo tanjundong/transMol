@@ -360,9 +360,14 @@ class VAE(pl.LightningModule):
             peak_lr=0.1,
             final_lr=1e-4,
             final_lr_scale=0.05,
-            warmup_steps=3000,
+            warmup_steps=warmup,
             decay_steps=17000,
         )
+        scheduler = {
+            'scheduler': scheduler,
+            'interval': 'step', # or 'epoch'
+            'frequency: 1
+        }
 
         return [opt], [scheduler]
         #optimizers = NoamOpt(dim, lr, warmup,
