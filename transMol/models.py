@@ -9,6 +9,7 @@ import copy
 from nets import Encoder, Decoder, Embedding, EncoderDecoder, Generator
 from utils import subsequent_mask, make_std_mask
 from optimizers import NoamOpt
+from utils import TransformerLRScheduler
 
 import loss as loss_fn
 import metrics
@@ -353,7 +354,17 @@ class VAE(pl.LightningModule):
         opt = torch.optim.AdamW(self.parameters(), lr=1e-4, betas=(0.9, 0.98), eps=1e-9)
 
 
-        return opt
+        scheduler = TransformerLRScheduler(
+            optimizer=opt,
+            init_lr=1e-10,
+            peak_lr=0.1,
+            final_lr=1e-4,
+            final_lr_scale=0.05,
+            warmup_steps=3000,
+            decay_steps=17000,
+        )
+
+        return [opt], [scheduler]
         #optimizers = NoamOpt(dim, lr, warmup,
         #                     torch.optim.Adam(self.model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
 

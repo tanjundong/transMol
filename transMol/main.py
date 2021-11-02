@@ -6,6 +6,7 @@ from pytorch_lightning.loggers import WandbLogger
 import wandb
 from tokenizer import SmilesTokenizer
 from torch.utils.tensorboard import SummaryWriter
+from pytorch_lightning.callbacks import LearningRateMonitor
 
 tokenizer = SmilesTokenizer.load('./a.vocab')
 gpus = 8
@@ -17,7 +18,7 @@ configs = {
     'n_heads': 8,
     'n_encode_layers': 6,
     'n_decode_layers': 6,
-    'batch_size': 16*16*2*gpus,
+    'batch_size': 16*16*2*(gpus+2),
 }
 configs['vocab_size'] = tokenizer.size
 
@@ -50,14 +51,16 @@ wandb_logger = WandbLogger()
 
 wandb_logger.watch(model.model)
 
+lr_monitor = LearningRateMonitor(logging_interval='step')
 trainer = pl.Trainer(
     gpus=gpus,
     logger=wandb_logger,
-    max_epochs=100,
+    max_epochs=300,
     accelerator='dp',
     log_every_n_steps=2,
     gradient_clip_val=0.25,
-    resume_from_checkpoint = './transMol-transMol/wp2rav54/checkpoints/epoch=65-step=41051.ckpt',
+    callbacks =[lr_monitor],
+    resume_from_checkpoint='./transMol-transMol/ztf91z1d/checkpoints/epoch=129-step=32369.ckpt'
 )
 
 trainer.fit(model, data_model)
