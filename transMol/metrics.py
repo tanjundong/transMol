@@ -7,7 +7,8 @@ from tokenizer import SmilesTokenizer
 
 def smiles_reconstruct_accuracy(
     logit: torch.Tensor,
-    gt: torch.Tensor):
+    gt: torch.Tensor,
+    pad_idx=0):
     """smiles_reconstruct_accuracy.
 
     Parameters
@@ -38,8 +39,13 @@ def smiles_reconstruct_accuracy(
 
     #print(gt[0], pred[0], mask[0])
     gt = gt.view(-1).long()
+    idx = gt!=pad_idx
+    gt = gt[idx]
     pred = pred.view(-1).long()
+    pred = pred[idx]
+    s = gt.shape[0]
     #err = F.l1_loss(pred, gt, reduction='mean')
     err = (gt!=pred).long()
-    return 1 - torch.sum(err)/(B*L)
+    return 1 - torch.sum(err)/(s+0.001)
+
 
