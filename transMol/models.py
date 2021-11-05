@@ -193,8 +193,10 @@ class VAE(pl.LightningModule):
         return self.prior
 
     def on_step(self, batch, batch_idx, is_training):
-        if is_training:
-            self.train()
+        #if is_training:
+        #    self.train()
+        #else:
+        #    self.eval()
         src, y = batch #[B,L], [B,L]
         pad_idx = 0
         src = Variable(src.long())
@@ -218,16 +220,16 @@ class VAE(pl.LightningModule):
 
         #loss_a_mim = loss_fn.smiles_mim_loss(mu, logvar, mem, self.get_prior())
         #loss_a_mim = loss_fn.loss_mmd(mu)
-        loss_a_mim = loss_fn.KL_loss(mu, logvar, 0.5)
+        #loss_a_mim = loss_fn.KL_loss(mu, logvar, 0.5)
         loss_bce = loss_fn.smiles_bce_loss(logit, y, pad_idx)
         #print(pred_len.shape, true_len.shape)
 
-        loss_length = loss_fn.len_bce_loss(pred_len,  true_len)
+        #loss_length = loss_fn.len_bce_loss(pred_len,  true_len)
         #loss_length = 0.0
         return {
-            'loss_a_mim': loss_a_mim,
+            'loss_a_mim': 0.0,
             'loss_bce': loss_bce,
-            'loss_length': loss_length,
+            'loss_length': 0.0,
             'out': out,
             'src': src,
             'tgt': tgt,
@@ -296,40 +298,42 @@ class VAE(pl.LightningModule):
         self.log('val/loss_length', loss_length, on_step=True)
 
 
+        #total = loss_a_mim + loss_bce + 0*loss_length
         total = loss_a_mim + loss_bce + 0*loss_length
-        self.log('val/loss', total, on_step=True)
+        self.log('val/loss', total, on_step=True, prog_bar=True)
 
         tgt = batch_parts['tgt'] #[2xB,L]
         #print('tgt',tgt.shape)
 
         #tgt = torch.cat(tgt, dim=0) #[2xB, L]
         out = batch_parts['out']
+        with torch.no_grad():
         #print(out)
-        logit = out['logit']
-        smiles_acc = metrics.smiles_reconstruct_accuracy(logit, tgt)
-        self.log('val/smiles_ac', smiles_acc, on_step=True)
+            logit = out['logit']
+            smiles_acc = metrics.smiles_reconstruct_accuracy(logit, tgt)
+            self.log('val/smiles_ac', smiles_acc, on_step=True)
 
-        tokenizer = SmilesTokenizer.load('./a.vocab')
-        src = batch_parts['src']
-        a = src[0].unsqueeze(0).detach()
+            tokenizer = SmilesTokenizer.load('./a.vocab')
+            src = batch_parts['src']
+            a = src[0].unsqueeze(0).detach()
 
-        #self.cuda()
+            #self.cuda()
 
 
-        #print(a, self.tgt_embedding)
-        print(' ')
-        c = torch.ones_like(a)
-        c[:, 0:3] =  a[:, 0:3]
-        ret = self.sample_neighbor(a, 2, None)
-        b = a[0].cpu().numpy().tolist()
-        smiles = tokenizer.ids2smiles(b)
-        print('origin smiles')
-        print(smiles)
-        for b in ret:
-            s = tokenizer.ids2smiles(b)
-            print(s)
+            #print(a, self.tgt_embedding)
+            print(' ')
+            ret = self.sample_neighbor(a, 2, None)
+            b = a[0].cpu().numpy().tolist()
+            c = torch.argmax(logit[0], dim=-1).cpu().numpy().tolist()
+            smiles = tokenizer.ids2smiles(b)
+            print('origin smiles')
+            print(smiles)
+            print(tokenizer.ids2smiles(c))
+            for b in ret:
+                s = tokenizer.ids2smiles(b)
+                print(s)
 
-        print('='*20)
+            print('='*20)
 
 
         return total
@@ -357,11 +361,11 @@ class VAE(pl.LightningModule):
         scheduler = TransformerLRScheduler(
             optimizer=opt,
             init_lr=1e-5,
-            peak_lr=0.1,
-            final_lr=1e-4,
+            peak_lr=0.01,
+            final_lr=1e-5,
             final_lr_scale=0.05,
             warmup_steps=warmup,
-            decay_steps=17000,
+            decay_steps=170000,
         )
         scheduler = {
             'scheduler': scheduler,
