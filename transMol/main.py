@@ -13,12 +13,12 @@ gpus = 2
 configs = {
     'hidden_dim': 768,
     'ff_dim': 512,
-    'max_len': 80,
+    'max_len': 64,
     'vocab_size': 100,
     'n_heads': 4,
-    'n_encode_layers': 4,
-    'n_decode_layers': 4,
-    'batch_size': 16*16*2*gpus,
+    'n_encode_layers': 6,
+    'n_decode_layers': 6,
+    'batch_size': 16*16*(gpus),
 }
 configs['vocab_size'] = tokenizer.size
 
@@ -55,11 +55,13 @@ lr_monitor = LearningRateMonitor(logging_interval='step')
 trainer = pl.Trainer(
     gpus=gpus,
     logger=wandb_logger,
-    max_epochs=200,
+    max_epochs=300,
     accelerator='dp',
-    log_every_n_steps=2,
+    log_every_n_steps=20,
     gradient_clip_val=0.25,
     callbacks =[lr_monitor],
+    #resume_from_checkpoint='./transMol-transMol/ztf91z1d/checkpoints/epoch=129-step=32369.ckpt'
+    #default_root_dir="./checkpoints"
 )
 
 trainer.fit(model, data_model)

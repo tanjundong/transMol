@@ -306,7 +306,7 @@ class GPTDecoderLayer(DecoderLayer):
 
 
 
-class ConvBottleneck(nn.Module):
+class ConvPool(nn.Module):
     """
     Set of convolutional layers to reduce memory matrix to single
     latent vector
@@ -338,7 +338,11 @@ class ConvBottleneck(nn.Module):
         for i, conv in enumerate(self.conv_layers):
             print(i, x.shape)
             x = F.relu(conv(x))
-        return x
+            B,D,L = x.shape
+            if L<10:
+                break
+
+        return torch.mean(x, dim=-1, keepdim=False)
 
     def get_final_dim(self, max_len):
         out_dim = max_len

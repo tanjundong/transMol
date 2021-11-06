@@ -220,16 +220,17 @@ class VAE(pl.LightningModule):
 
         #loss_a_mim = loss_fn.smiles_mim_loss(mu, logvar, mem, self.get_prior())
         #loss_a_mim = loss_fn.loss_mmd(mu)
+        loss_a_mim = loss_fn.loss_mmd(mu)
         #loss_a_mim = loss_fn.KL_loss(mu, logvar, 0.5)
         loss_bce = loss_fn.smiles_bce_loss(logit, y, pad_idx)
         #print(pred_len.shape, true_len.shape)
 
-        #loss_length = loss_fn.len_bce_loss(pred_len,  true_len)
+        loss_length = loss_fn.len_bce_loss(pred_len,  true_len)
         #loss_length = 0.0
         return {
-            'loss_a_mim': 0.0,
+            'loss_a_mim': loss_a_mim,
             'loss_bce': loss_bce,
-            'loss_length': 0.0,
+            'loss_length': loss_length,
             'out': out,
             'src': src,
             'tgt': tgt,
@@ -255,7 +256,7 @@ class VAE(pl.LightningModule):
         self.log('train/loss_length', loss_length, on_step=True)
 
 
-        total = loss_a_mim + loss_bce + 0*loss_length
+        total = loss_a_mim + loss_bce + loss_length
 
         self.log('train/loss', total, on_step=True)
 
@@ -299,7 +300,7 @@ class VAE(pl.LightningModule):
 
 
         #total = loss_a_mim + loss_bce + 0*loss_length
-        total = loss_a_mim + loss_bce + 0*loss_length
+        total = loss_a_mim + loss_bce + loss_length
         self.log('val/loss', total, on_step=True, prog_bar=True)
 
         tgt = batch_parts['tgt'] #[2xB,L]
@@ -355,13 +356,49 @@ class VAE(pl.LightningModule):
             lr = configs.get('lr')
             warmup = configs.get('warmup_steps')
 
-        opt = torch.optim.AdamW(self.parameters(), lr=1e-4, betas=(0.9, 0.98), eps=1e-9)
+        decay = set()
+        no_decay = set()
+        whitelist_weight_modules = (torch.nn.Linear, )
+        blacklist_weight_modules = (torch.nn.LayerNorm, torch.nn.Embedding)
+        for mn, m in self.named_modules():
+            for pn, p in m.named_parameters():
+                fpn = '%s.%s' % (mn, pn) if mn else pn # full param name
+
+                if pn.endswith('bias'):
+                    # all biases will not be decayed
+                    no_decay.add(fpn)
+                elif pn.endswith('weight') and isinstance(m, whitelist_weight_modules):
+                    # weights of whitelist modules will be weight decayed
+                    decay.add(fpn)
+                elif pn.endswith('weight') and isinstance(m, blacklist_weight_modules):
+                    # weights of blacklist modules will NOT be weight decayed
+                    no_decay.add(fpn)
+
+        # special case the position embedding parameter in the root GPT module as not decayed
+        #no_decay.add('pos_emb')
+
+        # validate that we considered every parameter
+        param_dict = {pn: p for pn, p in self.named_parameters()}
+        inter_params = decay & no_decay
+        union_params = decay | no_decay
+        assert len(inter_params) == 0, "parameters %s made it into both decay/no_decay sets!" % (str(inter_params), )
+        assert len(param_dict.keys() - union_params) == 0, "parameters %s were not separated into either decay/no_decay set!" \
+                                                    % (str(param_dict.keys() - union_params), )
+
+        # create the pytorch optimizer object
+        optim_groups = [
+            {"params": [param_dict[pn] for pn in sorted(list(decay))], "weight_decay": 0.1},
+            {"params": [param_dict[pn] for pn in sorted(list(no_decay))], "weight_decay": 0.0},
+        ]
+        betas = (0.9, 0.95)
+        opt = torch.optim.AdamW(optim_groups, lr=1e-4, betas=betas)
+       # opt = torch.optim.Adam(self.parameters(), lr=1e-4, betas=(0.9, 0.98), eps=1e-9)
 
 
         scheduler = TransformerLRScheduler(
             optimizer=opt,
-            init_lr=1e-5,
-            peak_lr=0.01,
+            init_lr=1e-10,
+            peak_lr=0.001,
             final_lr=1e-5,
             final_lr_scale=0.05,
             warmup_steps=warmup,

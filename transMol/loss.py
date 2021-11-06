@@ -60,7 +60,7 @@ def smiles_bce_loss(pred: torch.Tensor,
     #gt = gt[idx]
     #pred= pred[idx]
     #ce = F.cross_entropy(pred, gt, ignore_index=padding_idx, reduction='mean')
-    ce = F.cross_entropy(pred, gt, reduction='mean')
+    ce = F.cross_entropy(pred, gt)
 
     return ce
 
