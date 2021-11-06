@@ -390,7 +390,32 @@ class MeanPool(nn.Module):
 
         #B,L,D = x.shape
         # to skip start token
-        y = torch.mean(x[:,1:,:], dim=1, keepdim=False)
+        y = torch.mean(x[:,:,:], dim=1, keepdim=False)
 
 
         return y
+
+
+class MLPPool(nn.Module):
+
+    def __init__(self,
+                 max_len: int,
+                 dropout: float = _DROPOUT):
+        super().__init__()
+        self.mlp = nn.Sequential(
+            nn.Linear(max_len, max_len//2, bias=False),
+            nn.ReLU(),
+            nn.Linear(max_len//2, max_len//4, bias=False),
+            nn.ReLU(),
+            nn.Dropout(dropout))
+
+
+    def forward(self,
+                x: torch.Tensor):
+
+        x = x.permute(0, 2, 1) #[B,D,L]
+        x = self.mlp(x) #[B,D, l//4)
+        x = torch.mean(x, dim=-1, keepdim=False) #[B,L]
+        return x
+
+

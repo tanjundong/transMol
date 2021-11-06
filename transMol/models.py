@@ -225,8 +225,8 @@ class VAE(pl.LightningModule):
         loss_bce = loss_fn.smiles_bce_loss(logit, y, pad_idx)
         #print(pred_len.shape, true_len.shape)
 
-        loss_length = loss_fn.len_bce_loss(pred_len,  true_len)
-        #loss_length = 0.0
+        #loss_length = loss_fn.len_bce_loss(pred_len,  true_len)
+        loss_length = 0.0
         return {
             'loss_a_mim': loss_a_mim,
             'loss_bce': loss_bce,
@@ -427,8 +427,8 @@ class VAE(pl.LightningModule):
     def sample_neighbor(self, src: torch.Tensor, n: int, prefix = None):
         mask = (src!=0).unsqueeze(-2)  #[B,1,L]
         mu, logvar, mean, pred_len, out = self.encode(src, mask)
-        pred_len = torch.argmax(pred_len, dim=-1)
-        pred_len = pred_len.item()
+        #pred_len = torch.argmax(pred_len, dim=-1)
+        #pred_len = pred_len.item()
         ret = []
         #print(src)
         for i in range(n):
