@@ -220,8 +220,8 @@ class VAE(pl.LightningModule):
 
         #loss_a_mim = loss_fn.smiles_mim_loss(mu, logvar, mem, self.get_prior())
         #loss_a_mim = loss_fn.loss_mmd(mu)
-        loss_a_mim = loss_fn.loss_mmd(mu)
-        #loss_a_mim = loss_fn.KL_loss(mu, logvar, 0.5)
+        #loss_a_mim = loss_fn.loss_mmd(mu)
+        loss_a_mim = loss_fn.KL_loss(mu, logvar, 0.5)
         loss_bce = loss_fn.smiles_bce_loss(logit, y, pad_idx)
         #print(pred_len.shape, true_len.shape)
 
@@ -358,7 +358,7 @@ class VAE(pl.LightningModule):
 
         decay = set()
         no_decay = set()
-        whitelist_weight_modules = (torch.nn.Linear, )
+        whitelist_weight_modules = (torch.nn.Linear, torch.nn.Conv1d, torch.nn.Conv2d)
         blacklist_weight_modules = (torch.nn.LayerNorm, torch.nn.Embedding)
         for mn, m in self.named_modules():
             for pn, p in m.named_parameters():
@@ -432,9 +432,10 @@ class VAE(pl.LightningModule):
         ret = []
         #print(src)
         for i in range(n):
-            #z = mu + torch.randn(self.latent_dim).cuda()
+            #std = torch.exp(0.5*logvar)
+            z = mu + torch.randn(self.latent_dim).cuda()
             #print(z[0,0:2])
-            z = mean
+            #z = mean
             token = self.greedy_decode(z, mask, prefix)[-1]
 
             ret.append(token.detach().cpu().numpy().tolist())
