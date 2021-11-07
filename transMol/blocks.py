@@ -317,7 +317,7 @@ class ConvPool(nn.Module):
         in_d = size
         first = True
         for i in range(3):
-            out_d = int((in_d - _BOTTLENECK_CHANNEL) // 2 + _BOTTLENECK_CHANNEL)
+            #out_d = int((in_d - _BOTTLENECK_CHANNEL) // 2 + _BOTTLENECK_CHANNEL)
             if first:
                 kernel_size = _BOTTLENECK_KERNEL_SIZE
                 first = False
@@ -326,17 +326,18 @@ class ConvPool(nn.Module):
             if i == 2:
                 out_d = _BOTTLENECK_KERNEL_SIZE
             pad = kernel_size//2+1
-            conv_layers.append(nn.Sequential(nn.Conv1d(in_d, out_d, kernel_size, padding=pad), nn.MaxPool1d(2)))
+            conv_layers.append(nn.Sequential(nn.Conv1d(in_d, in_d, kernel_size, padding=pad), nn.MaxPool1d(2)))
 
 
-            in_d = out_d
+            #in_d = out_d
         #print(len(conv_layers))
 
         self.conv_layers = nn.ModuleList(conv_layers)
 
     def forward(self, x):
+        x = x.permute(0, 2, 1) #[B,D,L]
         for i, conv in enumerate(self.conv_layers):
-            print(i, x.shape)
+            #print(i, x.shape)
             x = F.relu(conv(x))
             B,D,L = x.shape
             if L<10:

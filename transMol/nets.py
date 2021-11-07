@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from typing import Dict, List
 import numpy as np
 from blocks import TransEncoderLayer, TransDecoderLayer, FeedForward, GPTDecoderLayer
-from blocks import ConvBottleneck, DeconvBottleneck, MeanPool, MLPPool
+from blocks import MeanPool, MLPPool, ConvPool
 from base import Encoder, Decoder
 from base import EncoderLayer, DecoderLayer
 
@@ -39,9 +39,8 @@ class TransEncoder(Encoder):
             copy.deepcopy(layer) for _ in range(n_layers)])
 
         #self.bottleneck = MeanPool()
-        self.bottleneck = MLPPool(
-            max_len = max_len)
-
+        #self.bottleneck = MLPPool(max_len = max_len)
+        self.bottleneck = ConvPool(layer.size)
         final_dim = layer.size
         self.z_means = nn.Linear(final_dim, final_dim)
         self.z_var = nn.Linear(final_dim,  final_dim)
