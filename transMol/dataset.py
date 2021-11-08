@@ -3,6 +3,7 @@ from torch.utils.data import Dataset, DataLoader
 from tokenizer import SmilesTokenizer
 import numpy as np
 import pytorch_lightning as pl
+from rdkit import Chem
 
 class AutoRegressionDataset(Dataset):
 
@@ -40,12 +41,13 @@ class AutoRegressionDataset(Dataset):
                 #self.data.append(torch.from_numpy(np_ids).long())
         print('start tokenizing')
 
+        '''
         for s in self.smiles:
             ids = self.tokenizer.smiles2ids(s, self.max_len)
             l = len(s)
             l = min([l, self.max_len])
             self.data.append(ids[:l+2])
-
+        '''
 
     def __len__(self):
         return len(self.smiles)
@@ -59,13 +61,23 @@ class AutoRegressionDataset(Dataset):
 
     def __getitem__(self, idx):
 
-        ids = self.data[idx]
-        l = len(ids)
-        x = torch.zeros(self.max_len).long()
-        x[0:l] = torch.LongTensor(ids)
+        #ids = self.data[idx]
+        #l = len(ids)
+        #x = torch.zeros(self.max_len).long()
+        #x[0:l] = torch.LongTensor(ids)
         #smiles = self.smiles[idx]
         #ids = self.tokenizer.smiles2ids(smiles, self.max_len)
         #x = torch.LongTensor(ids)
+
+        smiles = self.smiles[idx]
+
+        smiles = self.permute_smiles(smiles)
+        if smiles is None:
+            smiles = self.smiles[idx]
+
+        ids = self.tokenizer.smiles2ids(smiles, self.max_len)
+        l = len(ids)
+        x = torch.LongTensor(ids)
 
         y = x.clone()
 
@@ -83,6 +95,79 @@ class AutoRegressionDataset(Dataset):
         #y = y[:-1] + [0]
         #print(x.shape, y.shape)
         return x, y
+
+    def permute_smiles(self, smiles_str: str, seed: int = None):
+        """
+        Permute the input smiles.
+
+        Args:
+          smiles_str: The smiles input
+
+        Returns:
+          The standardised permuted smiles.
+        """
+        if seed is not None:
+            np.random.seed(seed)
+
+        try:
+            mol = Chem.MolFromSmiles(smiles_str, sanitize=False)
+        except Exception as e:
+            logging.warning(f'Chem.MolFromSmiles failed smiles="{smiles_str}" error={e}')
+            return None
+
+        if mol is None:
+            # invalid?
+            return None
+        ans = list(range(mol.GetNumAtoms()))
+        np.random.shuffle(ans)
+
+        # re-order the molecule
+        smiles = Chem.MolToSmiles(Chem.RenumberAtoms(mol, ans), canonical=False)
+
+        # standardise and return
+        return self.standardise(smiles)
+
+    def standardise(self, smiles: str, canonicalise:bool = None) -> str:
+        """
+        Standardise a SMILES string if valid (canonical + kekulized)
+
+        Args:
+            smiles: SMILES string
+            canonicalise: optional flag to override `self.canonicalise`
+
+        Returns: standard version the SMILES if valid, None otherwise
+
+        """
+        try:
+            mol = Chem.MolFromSmiles(smiles, sanitize=False)
+        except Exception as e:
+            # invalid?
+            logging.warning(f'Chem.MolFromSmiles failed smiles="{smiles}" error={e}')
+            return None
+
+        if mol is None:
+            # invalid?
+            logging.warning(f'Chem.MolFromSmiles failed smiles="{smiles}"')
+            return None
+
+        flags = Chem.SanitizeFlags.SANITIZE_ALL ^ Chem.SanitizeFlags.SANITIZE_CLEANUP
+        Chem.SanitizeMol(mol, flags, catchErrors=True)
+
+        if canonicalise:
+            # bug where permuted smiles are not canonicalised to the same form. This is fixed by round tripping SMILES
+            mol = Chem.MolFromSmiles(Chem.MolToSmiles(mol))
+            if mol is None:
+                logging.warning(f'Chem.MolFromSmiles failed after sanitization smiles="{smiles}"')
+                return None
+
+        try:
+            Chem.Kekulize(mol, clearAromaticFlags=True)
+            smiles = Chem.MolToSmiles(mol, kekuleSmiles=True, canonical=canonicalise)
+        except (ValueError, RuntimeError):
+            logging.warning(f'SMILES failed Kekulization! {smiles}')
+            return None
+
+        return smiles
 
 
 class SmilesDataMudule(pl.LightningDataModule):
@@ -102,8 +187,9 @@ class SmilesDataMudule(pl.LightningDataModule):
 
     def setup(self, stage=None):
 
-        self.trainset = AutoRegressionDataset(self.train_path, self.tokenizer, True, False, self.max_len)
+        self.trainset = AutoRegressionDataset(self.train_path, self.tokenizer, True, True, self.max_len)
         self.validset = AutoRegressionDataset(self.val_path, self.tokenizer, False, False, self.max_len)
+
 
 
     def train_dataloader(self):

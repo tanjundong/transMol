@@ -7,22 +7,11 @@ import wandb
 from tokenizer import SmilesTokenizer
 from torch.utils.tensorboard import SummaryWriter
 from pytorch_lightning.callbacks import LearningRateMonitor
+from configs import configs, tokenizer
 
-tokenizer = SmilesTokenizer.load('./a.vocab')
+
+
 gpus = 2
-configs = {
-    'hidden_dim': 768,
-    'ff_dim': 512,
-    'max_len': 64,
-    'vocab_size': 100,
-    'n_heads': 4,
-    'n_encode_layers': 6,
-    'n_decode_layers': 6,
-    'batch_size': 16*16*(gpus),
-}
-configs['vocab_size'] = tokenizer.size
-
-
 wandb.init(config=configs)
 configs = wandb.config
 model = get_model('trans', configs)
@@ -60,7 +49,7 @@ trainer = pl.Trainer(
     log_every_n_steps=20,
     gradient_clip_val=0.25,
     callbacks =[lr_monitor],
-    #resume_from_checkpoint='./transMol-transMol/ztf91z1d/checkpoints/epoch=129-step=32369.ckpt'
+    #resume_from_checkpoint='./transMol-transMol/39s4wa4n/checkpoints/epoch=22-step=57200.ckpt'
     #default_root_dir="./checkpoints"
 )
 
