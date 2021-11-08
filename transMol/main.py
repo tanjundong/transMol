@@ -9,14 +9,14 @@ from torch.utils.tensorboard import SummaryWriter
 from pytorch_lightning.callbacks import LearningRateMonitor
 
 tokenizer = SmilesTokenizer.load('./a.vocab')
-gpus = 2
+gpus = 8
 configs = {
     'hidden_dim': 768,
     'ff_dim': 512,
     'max_len': 64,
     'vocab_size': 100,
-    'n_heads': 4,
-    'n_encode_layers': 6,
+    'n_heads': 8,
+    'n_encode_layers': 10,
     'n_decode_layers': 6,
     'batch_size': 16*16*(gpus),
 }
