@@ -133,7 +133,8 @@ class VAE(pl.LightningModule):
         decoded = torch.ones(mu.shape[0], 1).fill_(1).long()
         if src_mask is None:
             pass
-        length = self.predict_length(mu)
+        #length = self.predict_length(mu)
+        length = 1
         #tgt = torch.ones(mu.shape[0], length+1).fill_(0).long()
         max_len = self.model.encoder.max_len
         tgt = torch.ones(mu.shape[0], self.model.encoder.max_len).fill_(3).long()
@@ -433,6 +434,9 @@ class VAE(pl.LightningModule):
         #print(src)
         for i in range(n):
             #std = torch.exp(0.5*logvar)
+            #eps = torch.rand_like(std)
+            #y = std*eps
+            #z = mu + y.cuda()
             z = mu + torch.randn(self.latent_dim).cuda()
             #print(z[0,0:2])
             #z = mean
@@ -442,6 +446,26 @@ class VAE(pl.LightningModule):
 
         return ret
 
+
+
+    def sample(self, n: int):
+
+
+        ret = []
+        mask = None
+        prefix = None
+        for i in range(n):
+            z = torch.randn(1, self.model.encoder.size)
+            z = z.cuda()
+            #eps = torch.rand_like(std)
+            #y = std*eps
+            #z = mu + y.cuda()
+            #z = mu + torch.randn(self.latent_dim).cuda()
+            #print(z[0,0:2])
+            token = self.greedy_decode(z, mask, prefix)[-1]
+
+            ret.append(token.detach().cpu().numpy().tolist())
+        return ret
 
 
 

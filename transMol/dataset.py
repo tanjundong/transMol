@@ -125,7 +125,8 @@ class AutoRegressionDataset(Dataset):
         smiles = Chem.MolToSmiles(Chem.RenumberAtoms(mol, ans), canonical=False)
 
         # standardise and return
-        return self.standardise(smiles)
+        #return self.standardise(smiles)
+        return smiles
 
     def standardise(self, smiles: str, canonicalise:bool = None) -> str:
         """
