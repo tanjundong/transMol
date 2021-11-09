@@ -232,7 +232,7 @@ class VAE(pl.LightningModule):
             'loss_length': loss_length,
             'out': out,
             'src': src,
-            'tgt': tgt,
+            'tgt': y,
         }
 
 
@@ -316,6 +316,7 @@ class VAE(pl.LightningModule):
             tokenizer = SmilesTokenizer.load('./a.vocab')
             src = batch_parts['src']
             a = src[0].unsqueeze(0).detach()
+            d = tgt[0].unsqueeze(0).detach()[0].cpu().numpy().tolist()
 
             #self.cuda()
 
@@ -327,6 +328,9 @@ class VAE(pl.LightningModule):
             c = torch.argmax(logit[0], dim=-1).cpu().numpy().tolist()
             smiles = tokenizer.ids2smiles(b)
             print('origin smiles')
+            print(smiles)
+            print('target smiles')
+            smiles = tokenizer.ids2smiles(d)
             print(smiles)
             print(tokenizer.ids2smiles(c))
             for b in ret:
