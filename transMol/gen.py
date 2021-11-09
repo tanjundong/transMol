@@ -15,13 +15,14 @@ assert isinstance(model, pl.LightningModule)
 model.load('./transMol-transMol/a.ckpt')
 
 #smiles = 'CC(=O)NC1CCC2(C)C(CCC3(C)C2C(=O)C=C2C4C(C)C(C)CCC4(C)CCC23C)C1(C)C(=O)O'
-smiles = sys.argv[-1]
-token = tokenizer.smiles2ids(smiles, configs['max_len'])
+#smiles = sys.argv[-1]
+#token = tokenizer.smiles2ids(smiles, configs['max_len'])
 model.cuda()
-a = torch.LongTensor(token).unsqueeze(0).cuda()
+#a = torch.LongTensor(token).unsqueeze(0).cuda()
 #a = torch.roll(a, -1, -1)
 
-ret = model.sample_neighbor(a, 10)
+#ret = model.sample_neighbor(a, 10)
+ret = model.sample(10)
 for b in ret:
     s = tokenizer.ids2smiles(b)
     print(s)
