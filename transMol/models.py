@@ -155,32 +155,30 @@ class VAE(pl.LightningModule):
             tgt[:,0] = 1
         #loss_length = 2
         with torch.no_grad():
-            for i in range(length):
-                decode_mask = subsequent_mask(decoded.size(1)).long()
-                if is_gpu:
-                    decode_mask = decode_mask.cuda()
+            if is_gpu:
+                decode_mask = decode_mask.cuda()
 
                 #decode_mask[:,i+1:, :] = False
                 #print(decode_mask)
                 #print(tgt.shape, mu.shape, src_mask.shape, decode_mask.shape)
-                out = self.model.decode(decoded, mu, src_mask,
-                                        decode_mask)
+            out = self.model.decode(decoded, mu, src_mask,
+                                    decode_mask)
 
 
-                out = self.model.generator(out) #[B,L,vocab]
-                #prob = F.softmax(out[:, i, :], dim=-1)
-                #_, next_word = torch.max(prob, dim=1)
-                idx = torch.argmax(out, dim=-1)
-                tgt = idx
-                #return idx
-                #next_word = idx[:, i]
-                #tgt[:, i+1] = next_word
+            out = self.model.generator(out) #[B,L,vocab]
+            #prob = F.softmax(out[:, i, :], dim=-1)
+            #_, next_word = torch.max(prob, dim=1)
+            idx = torch.argmax(out, dim=-1)
+            tgt = idx
+            #return idx
+            #next_word = idx[:, i]
+            #tgt[:, i+1] = next_word
 
-                #next_word = next_word.unsqueeze(1)
-                #decoded = torch.cat([decoded, next_word], dim=1)
-                #decoded = decoded.long()
-                #if i>=max_len-2:
-                #    break
+            #next_word = next_word.unsqueeze(1)
+            #decoded = torch.cat([decoded, next_word], dim=1)
+            #decoded = decoded.long()
+            #if i>=max_len-2:
+            #    break
 
         z = tgt
         return z

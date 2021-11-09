@@ -138,16 +138,21 @@ class TransDecoder(Decoder):
         #mem = F.relu(self.linar(mem)) #[B, 576]
 
         #mem = self.bottleneck(mem)
+        B, D = mem
 
 
 
 
         #print(mem.shape)
         mem = self.bridge(mem)
+
         mem = mem.view(-1, self.max_len, self.size) #[B,L,D]
 
-        mem, _ = self.encoder_layer(mem, src_mask)
+        #mem, _ = self.encoder_layer(mem, src_mask)
 
+        #mem = torch.expand_as(mem)
+        #mem = mem.unsqueeze(1) #[B,1,D]
+        #mem = mem.expand(B, self.max_len, self.size)
         #mem = self.norm(mem)
         #print('xx, mem', x.shape, mem.shape)
 
