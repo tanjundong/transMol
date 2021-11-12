@@ -7,7 +7,9 @@ from torch.optim import Optimizer
 from typing import Optional
 from typing import Dict, List
 import copy
-
+from rdkit import Chem
+from rdkit import RDLogger
+RDLogger.DisableLog('rdApp.*')
 
 def subsequent_mask(size: int) -> torch.Tensor:
     """subsequent_mask.
@@ -179,3 +181,10 @@ class TransformerLRScheduler(LearningRateScheduler):
         self.set_lr(self.optimizer, self.lr)
 
         return self.lr
+
+def is_smiles_valid(smiles: str):
+    mol = Chem.MolFromSmiles(smiles, sanitize=False)
+    if mol is not None:
+        return True
+    else:
+        return False

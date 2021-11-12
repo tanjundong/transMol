@@ -7,7 +7,7 @@ from typing import Dict, List
 import pytorch_lightning as pl
 import copy
 from nets import Encoder, Decoder, Embedding, EncoderDecoder, Generator
-from utils import subsequent_mask, make_std_mask
+from utils import subsequent_mask, make_std_mask, is_smiles_valid
 from optimizers import NoamOpt
 from utils import TransformerLRScheduler
 
@@ -26,7 +26,7 @@ class VAE(pl.LightningModule):
                  decoder: Decoder,
                  embedding: Embedding,
                  generator: Generator,
-                 training_configs = None
+                 training_configs = dict()
                  ):
         """__init__.
 
@@ -67,7 +67,7 @@ class VAE(pl.LightningModule):
         src_embedding = embedding
         tgt_embedding = copy.deepcopy(embedding)
 
-
+        self.n_epoch = 0
         # build model
         self.model = EncoderDecoder(
             src_embedding,
@@ -161,26 +161,20 @@ class VAE(pl.LightningModule):
                 #decode_mask[:,i+1:, :] = False
                 #print(decode_mask)
                 #print(tgt.shape, mu.shape, src_mask.shape, decode_mask.shape)
-            out = self.model.decode(decoded, mu, src_mask,
-                                    decode_mask)
+            for i in range(max_len):
+                out = self.model.decode(decoded, mu, src_mask,
+                                        decode_mask)
 
 
-            out = self.model.generator(out) #[B,L,vocab]
-            #prob = F.softmax(out[:, i, :], dim=-1)
-            #_, next_word = torch.max(prob, dim=1)
-            idx = torch.argmax(out, dim=-1)
-            tgt = idx
-            #return idx
-            #next_word = idx[:, i]
-            #tgt[:, i+1] = next_word
+                out = self.model.generator(out) #[B,L,vocab]
+                idx = torch.argmax(out, dim=-1)
+                idx = idx[:,i]
+                idx = idx.unsqueeze(1)
+                #print(idx.shape, decoded.shape)
+                decoded = torch.cat([decoded, idx], dim=-1)
 
-            #next_word = next_word.unsqueeze(1)
-            #decoded = torch.cat([decoded, next_word], dim=1)
-            #decoded = decoded.long()
-            #if i>=max_len-2:
-            #    break
 
-        z = tgt
+        z = decoded[:,1:]
         return z
 
 
@@ -206,7 +200,7 @@ class VAE(pl.LightningModule):
         src_mask.requires_grad = False
         tgt_mask = make_std_mask(tgt, pad_idx)
         tgt_mask.requires_grad = False
-        out = self.model.forward(src, tgt, src_mask, tgt_mask)
+        out = self.model.forward(src, y, src_mask, tgt_mask)
         true_len = src_mask.sum(dim=-1).squeeze(-1)
 
 
@@ -220,8 +214,9 @@ class VAE(pl.LightningModule):
         #loss_a_mim = loss_fn.smiles_mim_loss(mu, logvar, mem, self.get_prior())
         #loss_a_mim = loss_fn.loss_mmd(mu)
         #loss_a_mim = loss_fn.loss_mmd(mu)
-        loss_a_mim = loss_fn.KL_loss(mu, logvar, 0.5)
-        loss_bce = loss_fn.smiles_bce_loss(logit, y, pad_idx)
+        kl_weights = self.get_kl_weights()
+        loss_a_mim = loss_fn.KL_loss(mu, logvar, kl_weights)
+        loss_bce = loss_fn.smiles_bce_loss(logit, tgt, pad_idx)
         #print(pred_len.shape, true_len.shape)
 
         #loss_length = loss_fn.len_bce_loss(pred_len,  true_len)
@@ -232,7 +227,7 @@ class VAE(pl.LightningModule):
             'loss_length': loss_length,
             'out': out,
             'src': src,
-            'tgt': y,
+            'tgt': tgt,
         }
 
 
@@ -255,11 +250,38 @@ class VAE(pl.LightningModule):
         self.log('train/loss_length', loss_length, on_step=True)
 
 
+        kl_weights = self.get_kl_weights()
         total = loss_a_mim + loss_bce + loss_length
 
+        self.log('train/kl_weights', kl_weights, on_step=True)
         self.log('train/loss', total, on_step=True)
 
         return total
+
+
+    def get_kl_weights(self):
+
+        max_epoch = self.training_configs.get('max_epoch', 100)
+        max_kl_weights = float(self.training_configs.get('max_kl_weights', 5.0))
+
+        return min([max_kl_weights*float(self.n_epoch)/max_epoch, max_kl_weights])
+
+
+
+    def validation_epoch_end(self, validation_step_outputs):
+        tokenizer = SmilesTokenizer.load('./a.vocab')
+        out = self.sample(100, tokenizer)
+        n_valid = 0
+        for o in out:
+            is_valid = is_smiles_valid(o)
+            if len(o)<3:
+                is_valid = False
+            if is_valid:
+                n_valid +=1
+
+        self.log("val/n_valid", n_valid)
+        self.n_epoch +=1
+
 
 
     def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
@@ -335,7 +357,8 @@ class VAE(pl.LightningModule):
             print(tokenizer.ids2smiles(c))
             for b in ret:
                 s = tokenizer.ids2smiles(b)
-                print(s)
+                valid = is_smiles_valid(s)
+                print(s, valid)
 
             print('='*20)
 
@@ -357,16 +380,19 @@ class VAE(pl.LightningModule):
         configs = self.training_configs
         if configs is not None:
             lr = configs.get('lr')
-            warmup = configs.get('warmup_steps')
+            warmup = configs.get('warmup_steps', warmup)
 
         decay = set()
         no_decay = set()
-        whitelist_weight_modules = (torch.nn.Linear, torch.nn.Conv1d, torch.nn.Conv2d)
+        whitelist_weight_modules = (torch.nn.Linear, torch.nn.Conv1d, torch.nn.Conv2d, torch.nn.RNN)
         blacklist_weight_modules = (torch.nn.LayerNorm, torch.nn.Embedding)
         for mn, m in self.named_modules():
             for pn, p in m.named_parameters():
                 fpn = '%s.%s' % (mn, pn) if mn else pn # full param name
 
+                if pn.find('rnn')>-1:
+                    decay.add(fpn)
+                    continue
                 if pn.endswith('bias'):
                     # all biases will not be decayed
                     no_decay.add(fpn)
@@ -450,7 +476,7 @@ class VAE(pl.LightningModule):
 
 
 
-    def sample(self, n: int):
+    def sample(self, n: int, tokenizer: SmilesTokenizer=None):
 
 
         ret = []
@@ -465,8 +491,11 @@ class VAE(pl.LightningModule):
             #z = mu + torch.randn(self.latent_dim).cuda()
             #print(z[0,0:2])
             token = self.greedy_decode(z, mask, prefix)[-1]
+            token = token.detach().cpu().numpy().tolist()
+            if tokenizer is not None:
+                token = tokenizer.ids2smiles(token)
 
-            ret.append(token.detach().cpu().numpy().tolist())
+            ret.append(token)
         return ret
 
 
@@ -482,7 +511,11 @@ def get_model(name: str,
               configs: Dict[str, object]):
 
     if name=='trans':
-        from nets import TransEncoder, TransDecoder, TransEncoderLayer, TransDecoderLayer, PosEmbedding, GPTDecoderLayer
+        from nets import TransEncoder, TransDecoder, TransEncoderLayer
+        from nets import TransDecoderLayer, PosEmbedding, GPTDecoderLayer
+        from nets import RNNDecoder
+
+
         hidden_dim = configs.get('hidden_dim', 128)
         ff_dim = configs.get('ff_dim', 128)
         max_len = configs.get('max_len', 100)
@@ -513,18 +546,22 @@ def get_model(name: str,
             ff_dim)
 
 
-        decoder = TransDecoder(
-            n_decode_layers,
+        #decoder = TransDecoder(
+        #    n_decode_layers,
+        #    max_len,
+        #    encoder_layer,
+        #    decoder_layer)
+        decoder = RNNDecoder(
+            hidden_dim,
             max_len,
-            encoder_layer,
-            decoder_layer)
+            n_decode_layers)
 
 
         generator = Generator(
             hidden_dim,
             vocab_size)
 
-        model = VAE(encoder, decoder, embedding, generator)
+        model = VAE(encoder, decoder, embedding, generator, training_configs=configs)
         return model
 
 

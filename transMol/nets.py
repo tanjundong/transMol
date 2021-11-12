@@ -138,7 +138,7 @@ class TransDecoder(Decoder):
         #mem = F.relu(self.linar(mem)) #[B, 576]
 
         #mem = self.bottleneck(mem)
-        B, D = mem
+        #B, D = mem
 
 
 
@@ -167,6 +167,59 @@ class TransDecoder(Decoder):
 
 
         return self.norm(x)
+
+
+class RNNDecoder(Decoder):
+
+    def __init__(self,
+                 hidden_dim: int,
+                 max_len: int,
+                 n_layers: int,
+                 ):
+        super().__init__()
+
+        self.rnn = nn.GRU(
+            hidden_dim, hidden_dim,
+            n_layers, batch_first=True,
+            bidirectional=False)
+        self.hidden_dim = hidden_dim
+        self.max_len = max_len
+        self.n_layers = n_layers
+        self.bridge = nn.Linear(hidden_dim, max_len*hidden_dim)
+        self.proj = nn.Linear(hidden_dim, hidden_dim)
+
+
+    def forward(self,
+                x: torch.Tensor,
+                mem: torch.Tensor,
+                src_mask: torch.Tensor,
+                tgt_mask: torch.Tensor):
+        self.decode(x, mem, src_mask, tgt_mask)
+
+
+    def decode(self, x: torch.Tensor,
+                mem: torch.Tensor,
+                src_mask: torch.Tensor,
+                tgt_mask: torch.Tensor):
+
+        #x = torch.zeros_like(mem).to(mem.device)
+        B,D = mem.shape
+        L = self.max_len
+        #x = torch.ones((B,L,D)).to(mem.device)
+        h0 = mem.unsqueeze(0) #[1,B,D]
+        h0 = torch.cat([h0]*self.n_layers, dim=0) #[NL, B, D]
+        out,h = self.rnn(x, h0)
+
+        #x = self.bridge(mem)
+        #x = x.view(B, L, D)
+
+
+        #out,h = self.rnn(x)
+        out = self.proj(out)
+        #print(out, x.shape, h0.shape)
+
+        return out
+
 
 
 class EncoderDecoder(nn.Module):

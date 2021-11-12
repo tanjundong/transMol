@@ -76,18 +76,19 @@ class AutoRegressionDataset(Dataset):
             smiles = self.smiles[idx]
 
         ids = self.tokenizer.smiles2ids(smiles, self.max_len)
+        y = [self.tokenizer.ID_SOS] + ids[:-1]
         l = len(ids)
         x = torch.LongTensor(ids)
-
-        y = x.clone()
+        y = torch.LongTensor(y)
+        #y = x.clone()
 
 
         if self.is_denoising:
             m = self.get_noise_mask(l)
             x = x.masked_fill_(m, SmilesTokenizer.ID_MASK)
-            idx = x!=SmilesTokenizer.ID_MASK
-            tmp = x[idx]
-            x[0:tmp.shape[-1]] = tmp
+            #idx = x!=SmilesTokenizer.ID_MASK
+            #tmp = x[idx]
+            #x[0:tmp.shape[-1]] = tmp
 
 
         #x = x[1:]

@@ -7,11 +7,11 @@ import wandb
 from tokenizer import SmilesTokenizer
 from torch.utils.tensorboard import SummaryWriter
 from pytorch_lightning.callbacks import LearningRateMonitor
-from configs import configs, tokenizer
+from configs import configs, tokenizer, gpus
 
 tokenizer = SmilesTokenizer.load('./a.vocab')
 
-gpus = 8
+#gpus = 8
 wandb.init(config=configs)
 configs = wandb.config
 model = get_model('trans', configs)

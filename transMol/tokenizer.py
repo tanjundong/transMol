@@ -129,9 +129,13 @@ class SmilesTokenizer():
                    ids: List[int]) -> str:
         ret = []
         for id in ids:
+            if id==self.ID_PAD:
+                break
             ret.append(self.id2char(id))
 
-        return ''.join(ret)
+        #return ''.join(ret)
+        smiles = ''.join(ret)
+        return smiles
 
 
     def dump(self,
