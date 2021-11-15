@@ -80,26 +80,25 @@ class AutoRegressionDataset(Dataset):
         l = len(ids)
         x = torch.LongTensor(ids)
         y = torch.LongTensor(y)
-        #y = x.clone()
 
-
+        noise_x = x.clone()
         if self.is_denoising:
             m = self.get_noise_mask(l)
-            x = x.masked_fill_(m, SmilesTokenizer.ID_MASK)
+            noise_x = x.masked_fill_(m, SmilesTokenizer.ID_MASK)
+            #y = torch.cat([self.tokenizer.ID_SOS], noise_x[:-1])
+            y = torch.Tensor([self.tokenizer.ID_SOS]) + noise_x[:-1]
+            y = y.long()
             #idx = x!=SmilesTokenizer.ID_MASK
             #tmp = x[idx]
             #x[0:tmp.shape[-1]] = tmp
 
 
-        #x = x[1:]
-        #x = x[:-1]
-        #x = x[1: ]
-        #y = y[1: ]
-
-        #y = torch.roll(y, -1, dims=-1)
-        #y = y[:-1] + [0]
-        #print(x.shape, y.shape)
-        return x, y
+        #return noise_x, x, y
+        return {
+            'noise': noise_x,
+            'src': x,
+            'tgt': y
+        }
 
     def permute_smiles(self, smiles_str: str, seed: int = None):
         """
@@ -193,8 +192,10 @@ class SmilesDataMudule(pl.LightningDataModule):
 
     def setup(self, stage=None):
 
-        self.trainset = AutoRegressionDataset(self.train_path, self.tokenizer, True, True, self.max_len)
-        self.validset = AutoRegressionDataset(self.val_path, self.tokenizer, True, False, self.max_len)
+        self.trainset = AutoRegressionDataset(self.train_path,
+                                              self.tokenizer, True, False, self.max_len)
+        self.validset = AutoRegressionDataset(self.val_path,
+                                              self.tokenizer, True, False, self.max_len)
 
 
 

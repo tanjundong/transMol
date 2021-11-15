@@ -44,10 +44,10 @@ lr_monitor = LearningRateMonitor(logging_interval='step')
 trainer = pl.Trainer(
     gpus=gpus,
     logger=wandb_logger,
-    max_epochs=300,
+    max_epochs=configs['max_epoch'],
     accelerator='dp',
     log_every_n_steps=20,
-    gradient_clip_val=0.25,
+    gradient_clip_val=1.0,
     callbacks =[lr_monitor],
     #resume_from_checkpoint='./transMol-transMol/39s4wa4n/checkpoints/epoch=22-step=57200.ckpt'
     #default_root_dir="./checkpoints"

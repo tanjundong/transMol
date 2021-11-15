@@ -190,17 +190,21 @@ class VAE(pl.LightningModule):
         #    self.train()
         #else:
         #    self.eval()
-        src, y = batch #[B,L], [B,L]
+        #noise_src, src, y = batch #[B,L], [B,L]
+        noise = batch['noise']
+        src = batch['src']
+        tgt = batch['tgt']
+
         pad_idx = 0
-        src = Variable(src.long())
-        tgt = Variable(src.clone())
+        #src = Variable(src.long())
+        #tgt = Variable(src.clone())
         #tgt[:, 1:] = 1
         #src2.requires_grad = False
         src_mask = (src!=pad_idx).unsqueeze(-2)
         src_mask.requires_grad = False
         tgt_mask = make_std_mask(tgt, pad_idx)
         tgt_mask.requires_grad = False
-        out = self.model.forward(src, y, src_mask, tgt_mask)
+        out = self.model.forward(noise, tgt, src_mask, tgt_mask)
         true_len = src_mask.sum(dim=-1).squeeze(-1)
 
 
@@ -216,7 +220,8 @@ class VAE(pl.LightningModule):
         #loss_a_mim = loss_fn.loss_mmd(mu)
         kl_weights = self.get_kl_weights()
         loss_a_mim = loss_fn.KL_loss(mu, logvar, kl_weights)
-        loss_bce = loss_fn.smiles_bce_loss(logit, tgt, pad_idx)
+        #print(logit.shape, src.shape)
+        loss_bce = loss_fn.smiles_bce_loss(logit, src, pad_idx)
         #print(pred_len.shape, true_len.shape)
 
         #loss_length = loss_fn.len_bce_loss(pred_len,  true_len)
@@ -228,6 +233,7 @@ class VAE(pl.LightningModule):
             'out': out,
             'src': src,
             'tgt': tgt,
+            'noise': noise,
         }
 
 
@@ -262,7 +268,7 @@ class VAE(pl.LightningModule):
     def get_kl_weights(self):
 
         max_epoch = self.training_configs.get('max_epoch', 100)
-        max_kl_weights = float(self.training_configs.get('max_kl_weights', 5.0))
+        max_kl_weights = float(self.training_configs.get('max_kl_weights', 1.0))
 
         return min([max_kl_weights*float(self.n_epoch)/max_epoch, max_kl_weights])
 
@@ -324,7 +330,7 @@ class VAE(pl.LightningModule):
         total = loss_a_mim + loss_bce + loss_length
         self.log('val/loss', total, on_step=True, prog_bar=True)
 
-        tgt = batch_parts['tgt'] #[2xB,L]
+        tgt = batch_parts['src'] #[2xB,L]
         #print('tgt',tgt.shape)
 
         #tgt = torch.cat(tgt, dim=0) #[2xB, L]
