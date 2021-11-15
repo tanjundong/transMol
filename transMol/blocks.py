@@ -12,6 +12,61 @@ from base import DecoderLayer
 _BOTTLENECK_KERNEL_SIZE = 9
 _BOTTLENECK_CHANNEL = 64
 _DROPOUT = 0.2
+
+
+class CausalAttention(nn.Module):
+    """
+    A vanilla multi-head masked self-attention layer with a projection at the end.
+    It is possible to use torch.nn.MultiheadAttention here but I am including an
+    explicit implementation here to show that there is nothing too scary here.
+    """
+
+    def __init__(self,
+                 hidden_dim:int,
+                 n_heads :int,
+                 max_len:int,
+                 dropout: float=_DROPOUT
+                 ):
+        super().__init__()
+        # key, query, value projections for all heads
+        self.key = nn.Linear(hidden_dim, hidden_dim)
+        self.query = nn.Linear(hidden_dim, hidden_dim)
+        self.value = nn.Linear(hidden_dim, hidden_dim)
+        # regularization
+        self.attn_drop = nn.Dropout(dropout)
+        self.resid_drop = nn.Dropout(dropout)
+        # output projection
+        self.proj = nn.Linear(hidden_dim, hidden_dim)
+        # causal mask to ensure that attention is only applied to the left in the input sequence
+        self.register_buffer("mask", torch.tril(torch.ones(max_len, max_len))
+                                     .view(1, 1, max_len, max_len))
+        self.n_head = n_heads
+
+    def forward(self, x, layer_past=None):
+        B, T, C = x.size()
+        if layer_past is not None:
+            z = layer_past
+        else:
+            z = x
+
+        # calculate query, key, values for all heads in batch and move head forward to be the batch dim
+        k = self.key(x).view(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
+        q = self.query(z).view(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
+        v = self.value(z).view(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
+
+        # causal self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
+        att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
+        att = att.masked_fill(self.mask[:,:,:T,:T] == 0, float('-inf'))
+        att = F.softmax(att, dim=-1)
+        att = self.attn_drop(att)
+        y = att @ v # (B, nh, T, T) x (B, nh, T, hs) -> (B, nh, T, hs)
+        y = y.transpose(1, 2).contiguous().view(B, T, C) # re-assemble all head outputs side by side
+
+        # output projection
+        y = self.resid_drop(self.proj(y))
+        return y, att
+
+
 class MultiheadAttention(nn.Module):
 
 
@@ -265,6 +320,7 @@ class GPTDecoderLayer(DecoderLayer):
                  hidden_dim: int,
                  n_heads: int,
                  ff_dim: int,
+                 max_len: int,
                  dropout: float = _DROPOUT):
         super().__init__(
             hidden_dim,
@@ -275,7 +331,8 @@ class GPTDecoderLayer(DecoderLayer):
         self.ln1 = nn.LayerNorm(hidden_dim)
         self.size = hidden_dim
         self.ln2 = nn.LayerNorm(hidden_dim)
-        self.atten = MultiheadAttention(hidden_dim, n_heads, dropout)
+        #self.atten = MultiheadAttention(hidden_dim, n_heads, dropout)
+        self.atten = CausalAttention(hidden_dim, n_heads, max_len)
         _dim = hidden_dim*4
         self.mlp = nn.Sequential(
             nn.Linear(hidden_dim, _dim),
@@ -294,7 +351,7 @@ class GPTDecoderLayer(DecoderLayer):
             #q = self.ln1(x)a
             #_x = mem_key
             _t = self.ln1(x)
-            y, atten = self.atten(_t, _t, _t, None)
+            y, atten = self.atten(_t, mem_key)
             x = x + y
             x = x + self.mlp(self.ln2(x))
             return x, atten

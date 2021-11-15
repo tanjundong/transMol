@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from typing import Dict, List
 import numpy as np
 from blocks import TransEncoderLayer, TransDecoderLayer, FeedForward, GPTDecoderLayer
-from blocks import MeanPool, MLPPool, ConvPool
+from blocks import MeanPool, MLPPool, ConvPool, MultiheadAttention
 from base import Encoder, Decoder
 from base import EncoderLayer, DecoderLayer
 
@@ -143,11 +143,16 @@ class TransDecoder(Decoder):
 
 
 
+
         #print(mem.shape)
         mem = self.bridge(mem)
 
         mem = mem.view(-1, self.max_len, self.size) #[B,L,D]
 
+        _x = torch.zeros_like(mem)
+        B,L,D = x.shape
+        _x[:,:L,:] = x
+        x = _x
         #mem, _ = self.encoder_layer(mem, src_mask)
 
         #mem = torch.expand_as(mem)
@@ -159,10 +164,12 @@ class TransDecoder(Decoder):
 
         mem = self.norm(mem)
 
-        if isinstance(self.layers[0], GPTDecoderLayer):
-            x = mem
+        #if isinstance(self.layers[0], GPTDecoderLayer):
+        #    x = mem
 
         for layer in self.layers:
+            #print(x.shape, mem.shape)
+
             x, _ = layer(x, mem, mem, src_mask, tgt_mask)
 
 
@@ -219,6 +226,54 @@ class RNNDecoder(Decoder):
         #print(out, x.shape, h0.shape)
 
         return out
+
+
+class AttentionRNNDecoder(Decoder):
+
+    def __init__(self,
+                 hidden_dim: int,
+                 max_len: int,
+                 n_layers: int,
+                 ):
+        super().__init__()
+
+        self.atten = nn.Linear(hidden_dim*2, hidden_dim)
+        self.atten_combine = nn.Linear(hidden_dim*2, hidden_dim)
+        self.dropout = nn.Dropout(0.5)
+        self.rnn = nn.GRU(
+            hidden_dim, hidden_dim,
+            n_layers, batch_first=True,
+            bidirectional=False)
+        self.hidden_dim = hidden_dim
+        self.max_len = max_len
+        self.n_layers = n_layers
+        self.bridge = nn.Linear(hidden_dim, max_len*hidden_dim)
+        self.proj = nn.Linear(hidden_dim, hidden_dim)
+        #self.attenion = GPTDecoderLayer(hidden_dim, 1, hidden_dim)
+
+
+
+
+
+
+    def forward(self,
+                x: torch.Tensor,
+                mem: torch.Tensor,
+                src_mask: torch.Tensor,
+                tgt_mask: torch.Tensor):
+        self.decode(x, mem, src_mask, tgt_mask)
+
+    def decode(self, x: torch.Tensor,
+                mem: torch.Tensor,
+                src_mask: torch.Tensor,
+                tgt_mask: torch.Tensor):
+
+        bridge = self.bridge(x)
+
+        x, att = self.attenion(x, bridge, bridge)
+
+
+
 
 
 

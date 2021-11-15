@@ -193,7 +193,7 @@ class SmilesDataMudule(pl.LightningDataModule):
 
     def setup(self, stage=None):
 
-        self.trainset = AutoRegressionDataset(self.train_path, self.tokenizer, True, True, self.max_len)
+        self.trainset = AutoRegressionDataset(self.train_path, self.tokenizer, True, False, self.max_len)
         self.validset = AutoRegressionDataset(self.val_path, self.tokenizer, True, False, self.max_len)
 
 

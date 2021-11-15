@@ -65,7 +65,7 @@ class VAE(pl.LightningModule):
 
         # embeddings
         src_embedding = embedding
-        tgt_embedding = copy.deepcopy(embedding)
+        tgt_embedding = embedding
 
         self.n_epoch = 0
         # build model
@@ -543,18 +543,19 @@ def get_model(name: str,
         decoder_layer = GPTDecoderLayer(
             hidden_dim,
             n_heads,
-            ff_dim)
+            ff_dim,
+            max_len)
 
 
-        #decoder = TransDecoder(
-        #    n_decode_layers,
-        #    max_len,
-        #    encoder_layer,
-        #    decoder_layer)
-        decoder = RNNDecoder(
-            hidden_dim,
+        decoder = TransDecoder(
+            n_decode_layers,
             max_len,
-            n_decode_layers)
+            encoder_layer,
+            decoder_layer)
+        #decoder = RNNDecoder(
+        #    hidden_dim,
+        #    max_len,
+        #    n_decode_layers)
 
 
         generator = Generator(
