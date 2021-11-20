@@ -65,7 +65,7 @@ class VAE(pl.LightningModule):
 
         # embeddings
         src_embedding = embedding
-        tgt_embedding = copy.deepcopy(embedding)
+        tgt_embedding = embedding
 
         self.n_epoch = 0
         # build model
@@ -276,7 +276,8 @@ class VAE(pl.LightningModule):
 
     def validation_epoch_end(self, validation_step_outputs):
         tokenizer = SmilesTokenizer.load('./a.vocab')
-        out = self.sample(100, tokenizer)
+        n = 200
+        out = self.sample(n, tokenizer)
         n_valid = 0
         for o in out:
             is_valid = is_smiles_valid(o)
@@ -284,7 +285,7 @@ class VAE(pl.LightningModule):
                 is_valid = False
             if is_valid:
                 n_valid +=1
-
+        n_valid = int(float(n_valid)/n*100.0)
         self.log("val/n_valid", n_valid)
         self.n_epoch +=1
 
@@ -549,18 +550,21 @@ def get_model(name: str,
         decoder_layer = GPTDecoderLayer(
             hidden_dim,
             n_heads,
-            ff_dim)
+            ff_dim,
+            max_len)
 
 
-        #decoder = TransDecoder(
-        #    n_decode_layers,
-        #    max_len,
-        #    encoder_layer,
-        #    decoder_layer)
-        decoder = RNNDecoder(
-            hidden_dim,
+        decoder = TransDecoder(
+            n_decode_layers,
             max_len,
-            n_decode_layers)
+            encoder_layer,
+            decoder_layer)
+        decoder_type = configs.get('decoder','trans')
+        if decoder_type == 'RNN':
+            decoder = RNNDecoder(
+                hidden_dim,
+                max_len,
+                n_decode_layers)
 
 
         generator = Generator(

@@ -7,11 +7,12 @@ configs = {
     'ff_dim': 1024,
     'max_len': 80,
     'vocab_size': 100,
-    'n_heads': 4,
-    'n_encode_layers': 10,
-    'n_decode_layers': 4,
+    'n_heads': 8,
+    'n_encode_layers': 6,
+    'n_decode_layers': 3,
     'max_kl_weights' : 1.0,
     'max_epoch': 300,
+    'decoder': 'RNN',
     'batch_size': 16*16*(len(gpus)),
 }
 configs['vocab_size'] = tokenizer.size

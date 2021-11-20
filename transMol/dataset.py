@@ -70,7 +70,8 @@ class AutoRegressionDataset(Dataset):
         #x = torch.LongTensor(ids)
 
         smiles = self.smiles[idx]
-
+        origin_ids = self.tokenizer.smiles2ids(smiles, self.max_len)
+        origin_ids = torch.Tensor(origin_ids).long()
         smiles = self.permute_smiles(smiles)
         if smiles is None:
             smiles = self.smiles[idx]
@@ -84,9 +85,11 @@ class AutoRegressionDataset(Dataset):
         noise_x = x.clone()
         if self.is_denoising:
             m = self.get_noise_mask(l)
-            noise_x = x.masked_fill_(m, SmilesTokenizer.ID_MASK)
+            noise_x = x.clone().masked_fill_(m, SmilesTokenizer.ID_MASK)
             #y = torch.cat([self.tokenizer.ID_SOS], noise_x[:-1])
-            y = torch.Tensor([self.tokenizer.ID_SOS]) + noise_x[:-1]
+            #y = torch.Tensor([self.tokenizer.ID_SOS]) + noise_x[:-1]
+            y = torch.cat((torch.Tensor([self.tokenizer.ID_SOS]), noise_x))
+            y = y[:-1]
             y = y.long()
             #idx = x!=SmilesTokenizer.ID_MASK
             #tmp = x[idx]
@@ -96,7 +99,7 @@ class AutoRegressionDataset(Dataset):
         #return noise_x, x, y
         return {
             'noise': noise_x,
-            'src': x,
+            'src': x ,
             'tgt': y
         }
 
