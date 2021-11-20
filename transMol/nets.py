@@ -112,7 +112,8 @@ class TransDecoder(Decoder):
                  n_layer: int,
                  max_len: int,
                  encoder_layer : EncoderLayer,
-                 layer: DecoderLayer):
+                 layer: DecoderLayer,
+                 decode_from_latent: True):
         super().__init__()
         hidden_dim = layer.size
         self.encoder_layer = encoder_layer
@@ -125,6 +126,7 @@ class TransDecoder(Decoder):
         self.bridge = nn.Linear(encoder_dim, max_len*layer.size)
         self.size = layer.size
         self.max_len = max_len
+        self.decode_from_latent = decode_from_latent
         #self.linar = nn.Linear(hidden_dim, 64*9)
         #self.bottleneck = DeconvBottleneck(hidden_dim)
 
@@ -164,8 +166,8 @@ class TransDecoder(Decoder):
 
         mem = self.norm(mem)
 
-        #if isinstance(self.layers[0], GPTDecoderLayer):
-        #    x = mem
+        if self.decode_from_latent:
+            x = mem
 
         for layer in self.layers:
             #print(x.shape, mem.shape)

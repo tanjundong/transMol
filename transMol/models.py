@@ -558,7 +558,9 @@ def get_model(name: str,
             n_decode_layers,
             max_len,
             encoder_layer,
-            decoder_layer)
+            decoder_layer,
+            configs.get('decode_from_latent', False))
+
         decoder_type = configs.get('decoder','trans')
         if decoder_type == 'RNN':
             decoder = RNNDecoder(
