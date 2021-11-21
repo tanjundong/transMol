@@ -26,6 +26,7 @@ class VAE(pl.LightningModule):
                  decoder: Decoder,
                  embedding: Embedding,
                  generator: Generator,
+                 adj_predictor: nn.Module,
                  training_configs = dict()
                  ):
         """__init__.
@@ -76,6 +77,7 @@ class VAE(pl.LightningModule):
             decoder,
             generator,
             True)
+        self.adj_predictor = adj_predictor
 
         self.training_configs = training_configs
 
@@ -222,19 +224,27 @@ class VAE(pl.LightningModule):
         loss_a_mim = loss_fn.KL_loss(mu, logvar, kl_weights)
         #print(logit.shape, src.shape)
         loss_bce = loss_fn.smiles_bce_loss(logit, src, pad_idx)
-        #print(pred_len.shape, true_len.shape)
-
-        #loss_length = loss_fn.len_bce_loss(pred_len,  true_len)
         loss_length = 0.0
-        return {
+
+        ret = {
             'loss_a_mim': loss_a_mim,
             'loss_bce': loss_bce,
             'loss_length': loss_length,
+            'loss_adj': 0.0,
             'out': out,
             'src': src,
             'tgt': tgt,
             'noise': noise,
+
         }
+        #print(pred_len.shape, true_len.shape)
+        if self.adj_predictor is not None:
+            adj = batch['adj']
+            pred_adj = self.adj_predictor(mem)
+            loss_adj = F.cross_entropy(pred_adj, adj, reduce='mean')
+            ret['loss_adj'] = loss_adj
+
+        return ret
 
 
 
@@ -246,18 +256,21 @@ class VAE(pl.LightningModule):
         loss_a_mim = batch_parts['loss_a_mim']
         loss_bce = batch_parts['loss_bce']
         loss_length = batch_parts['loss_length']
+        loss_adj = batch_parts['loss_adj']
 
         loss_a_mim = torch.mean(loss_a_mim)
         loss_bce = torch.mean(loss_bce)
         loss_length = torch.mean(loss_length)
+        loss_adj = torch.mean(loss_adj)
 
         self.log('train/loss_a_mim', loss_a_mim, on_step=True)
         self.log('train/loss_bce', loss_bce, on_step=True)
         self.log('train/loss_length', loss_length, on_step=True)
+        self.log('train/loss_adj', loss_adj, on_step=True)
 
 
         kl_weights = self.get_kl_weights()
-        total = loss_a_mim + loss_bce + loss_length
+        total = loss_a_mim + loss_bce + loss_length + loss_adj
 
         self.log('train/kl_weights', kl_weights, on_step=True)
         self.log('train/loss', total, on_step=True)
@@ -276,7 +289,7 @@ class VAE(pl.LightningModule):
 
     def validation_epoch_end(self, validation_step_outputs):
         tokenizer = SmilesTokenizer.load('./a.vocab')
-        n = 200
+        n = 100
         out = self.sample(n, tokenizer)
         n_valid = 0
         for o in out:
@@ -520,7 +533,7 @@ def get_model(name: str,
     if name=='trans':
         from nets import TransEncoder, TransDecoder, TransEncoderLayer
         from nets import TransDecoderLayer, PosEmbedding, GPTDecoderLayer
-        from nets import RNNDecoder
+        from nets import RNNDecoder, AdjacencyPredictor
 
 
         hidden_dim = configs.get('hidden_dim', 128)
@@ -573,7 +586,16 @@ def get_model(name: str,
             hidden_dim,
             vocab_size)
 
-        model = VAE(encoder, decoder, embedding, generator, training_configs=configs)
+        predict_adj = configs.get('predict_adj', False)
+        adj_predictor = None
+        if predict_adj:
+            adj_predictor = AdjacencyPredictor(
+                hidden_dim, max_len)
+
+        model = VAE(encoder, decoder, embedding,
+                    generator,
+                    adj_predictor,
+                    training_configs=configs)
         return model
 
 

@@ -405,3 +405,34 @@ class PosEmbedding(Embedding):
 
 
 
+class AdjacencyPredictor(nn.Module):
+
+    def __init__(self, hidden_dim: int,
+                 max_len:int):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.max_len = max_len
+        self.num_bound_type = 6
+
+
+        self.mlp = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim*2),
+            nn.ReLU(True),
+            nn.Dropout(),
+            nn.Linear(hidden_dim*2, hidden_dim),
+            nn.ReLU(True),
+            nn.Dropout(),
+            nn.Linear(hidden_dim, max_len*max_len*self.num_bound_type)
+            )
+
+
+    def forward(self,
+                x: torch.Tensor):
+
+        y = self.mlp(x) #[B, max_len*max_le*num_bound_type]
+        #y = y.view(-1, self.max_len, self.max_len, self.num_bound_type)
+        y = y.view(-1, self.num_bound_type, self.max_len, self.max_len)
+        return y
+
+
+

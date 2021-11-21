@@ -70,11 +70,28 @@ class AutoRegressionDataset(Dataset):
         #x = torch.LongTensor(ids)
 
         smiles = self.smiles[idx]
-        origin_ids = self.tokenizer.smiles2ids(smiles, self.max_len)
-        origin_ids = torch.Tensor(origin_ids).long()
+        #origin_ids = self.tokenizer.smiles2ids(smiles, self.max_len)
+        #origin_ids = torch.Tensor(origin_ids).long()
         smiles = self.permute_smiles(smiles)
         if smiles is None:
             smiles = self.smiles[idx]
+
+        adj = np.ones([self.max_len, self.max_len])
+        adj = -1 * adj
+
+        mol = Chem.MolFromSmiles(smiles)
+        am = Chem.GetAdjacencyMatrix(mol)
+        shape = am.shape
+        num_atoms = shape[0]
+        num_atoms = min([num_atoms, self.max_len])
+        try:
+            adj[0:num_atoms, 0:num_atoms] = am
+        except:
+            print(num_atoms, self.max_len)
+        adj = torch.Tensor(adj).long() +1
+
+
+
 
         ids = self.tokenizer.smiles2ids(smiles, self.max_len)
         y = [self.tokenizer.ID_SOS] + ids[:-1]
@@ -91,16 +108,14 @@ class AutoRegressionDataset(Dataset):
             y = torch.cat((torch.Tensor([self.tokenizer.ID_SOS]), noise_x))
             y = y[:-1]
             y = y.long()
-            #idx = x!=SmilesTokenizer.ID_MASK
-            #tmp = x[idx]
-            #x[0:tmp.shape[-1]] = tmp
 
 
         #return noise_x, x, y
         return {
             'noise': noise_x,
             'src': x ,
-            'tgt': y
+            'tgt': y,
+            'adj': adj,
         }
 
     def permute_smiles(self, smiles_str: str, seed: int = None):
