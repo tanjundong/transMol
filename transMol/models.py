@@ -66,7 +66,7 @@ class VAE(pl.LightningModule):
 
         # embeddings
         src_embedding = embedding
-        tgt_embedding = embedding
+        tgt_embedding = copy.deepcopy(embedding)
 
         self.n_epoch = 0
         # build model
@@ -219,9 +219,10 @@ class VAE(pl.LightningModule):
 
         #loss_a_mim = loss_fn.smiles_mim_loss(mu, logvar, mem, self.get_prior())
         #loss_a_mim = loss_fn.loss_mmd(mu)
-        #loss_a_mim = loss_fn.loss_mmd(mu)
+
         kl_weights = self.get_kl_weights()
-        loss_a_mim = loss_fn.KL_loss(mu, logvar, kl_weights)
+        #loss_a_mim = loss_fn.KL_loss(mu, logvar, kl_weights)
+        loss_a_mim = loss_fn.loss_mmd(mu, kl_weights)
         #print(logit.shape, src.shape)
         loss_bce = loss_fn.smiles_bce_loss(logit, src, pad_idx)
         loss_length = 0.0
@@ -241,7 +242,7 @@ class VAE(pl.LightningModule):
         if self.adj_predictor is not None:
             adj = batch['adj']
             pred_adj = self.adj_predictor(mem)
-            loss_adj = F.cross_entropy(pred_adj, adj, reduce='mean')
+            loss_adj = F.cross_entropy(pred_adj, adj, reduce='mean', ignore_index=0)
             ret['loss_adj'] = loss_adj
 
         return ret
@@ -298,7 +299,7 @@ class VAE(pl.LightningModule):
                 is_valid = False
             if is_valid:
                 n_valid +=1
-        n_valid = int(float(n_valid)/n*100.0)
+        #n_valid = int(float(n_valid)/n*100.0)
         self.log("val/n_valid", n_valid)
         self.n_epoch +=1
 

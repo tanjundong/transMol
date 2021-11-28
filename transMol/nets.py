@@ -223,7 +223,7 @@ class RNNDecoder(Decoder):
         #x = self.bridge(mem)
         #x = x.view(B, L, D)
         #out,h = self.rnn(x)
-        #out = self.proj(out)
+        out = self.proj(out)
         #print(out, x.shape, h0.shape)
 
         return out

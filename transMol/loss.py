@@ -135,6 +135,6 @@ def compute_mmd(x, y):
     xy_kernel = compute_kernel(x, y)
     return torch.mean(x_kernel) + torch.mean(y_kernel) - 2*torch.mean(xy_kernel)
 
-def loss_mmd(mean :torch.Tensor):
+def loss_mmd(mean :torch.Tensor, weights=0.5):
     true_sample = torch.randn_like(mean)
-    return compute_mmd(true_sample, mean)
+    return compute_mmd(true_sample, mean)*weights
