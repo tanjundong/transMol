@@ -87,7 +87,8 @@ class AutoRegressionDataset(Dataset):
         try:
             adj[0:num_atoms, 0:num_atoms] = am
         except:
-            print(num_atoms, self.max_len)
+            #print(num_atoms, self.max_len)
+            pass
         adj = torch.Tensor(adj).long() +1
 
 
@@ -211,7 +212,7 @@ class SmilesDataMudule(pl.LightningDataModule):
     def setup(self, stage=None):
 
         self.trainset = AutoRegressionDataset(self.train_path,
-                                              self.tokenizer, True, True, self.max_len)
+                                              self.tokenizer, True, False, self.max_len)
         self.validset = AutoRegressionDataset(self.val_path,
                                               self.tokenizer, True, False, self.max_len)
 

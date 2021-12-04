@@ -76,6 +76,7 @@ class TransEncoder(Encoder):
         mem = mem.contiguous().view(mem.size(0), -1)
         mu, logvar = self.z_means(mem), self.z_var(mem) #[B,D]
         mem = self.reparameters(mu, logvar, self.eps_scale) #[B,D]
+        #mem = mu
         #pred_len = self.len_prediction(mu)
         pred_len= 0.0
 
@@ -214,7 +215,7 @@ class RNNDecoder(Decoder):
         #x = torch.zeros_like(mem).to(mem.device)
         B,D = mem.shape
         L = self.max_len
-        x = torch.ones((B,L,D)).to(mem.device)
+        #x = torch.ones((B,L,D)).to(mem.device)
         h0 = mem.unsqueeze(0) #[1,B,D]
         h0 = torch.cat([h0]*self.n_layers, dim=0) #[NL, B, D]
         out,h = self.rnn(x, h0)
@@ -223,7 +224,7 @@ class RNNDecoder(Decoder):
         #x = self.bridge(mem)
         #x = x.view(B, L, D)
         #out,h = self.rnn(x)
-        #out = self.proj(out)
+        out = self.proj(out)
         #print(out, x.shape, h0.shape)
 
         return out

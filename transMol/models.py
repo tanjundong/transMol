@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
-from torch.autograd import Variable
 import torch.nn.functional as F
 from typing import Dict, List
 import pytorch_lightning as pl
@@ -66,7 +65,7 @@ class VAE(pl.LightningModule):
 
         # embeddings
         src_embedding = embedding
-        tgt_embedding = embedding
+        tgt_embedding = copy.deepcopy(embedding)
 
         self.n_epoch = 0
         # build model
@@ -198,13 +197,14 @@ class VAE(pl.LightningModule):
         tgt = batch['tgt']
 
         pad_idx = 0
-        #src = Variable(src.long())
-        #tgt = Variable(src.clone())
+        src = Variable(src.long())
+        #tgt = Variable(tgt.clone())
         #tgt[:, 1:] = 1
         #src2.requires_grad = False
         src_mask = (src!=pad_idx).unsqueeze(-2)
         src_mask.requires_grad = False
         tgt_mask = make_std_mask(tgt, pad_idx)
+        noise = src
         tgt_mask.requires_grad = False
         out = self.model.forward(noise, tgt, src_mask, tgt_mask)
         true_len = src_mask.sum(dim=-1).squeeze(-1)
@@ -219,9 +219,11 @@ class VAE(pl.LightningModule):
 
         #loss_a_mim = loss_fn.smiles_mim_loss(mu, logvar, mem, self.get_prior())
         #loss_a_mim = loss_fn.loss_mmd(mu)
-        #loss_a_mim = loss_fn.loss_mmd(mu)
+
         kl_weights = self.get_kl_weights()
         loss_a_mim = loss_fn.KL_loss(mu, logvar, kl_weights)
+        #kl_weights = 1.0
+        #loss_a_mim = loss_fn.loss_mmd(mu, kl_weights)
         #print(logit.shape, src.shape)
         loss_bce = loss_fn.smiles_bce_loss(logit, src, pad_idx)
         loss_length = 0.0
@@ -241,7 +243,7 @@ class VAE(pl.LightningModule):
         if self.adj_predictor is not None:
             adj = batch['adj']
             pred_adj = self.adj_predictor(mem)
-            loss_adj = F.cross_entropy(pred_adj, adj, reduce='mean')
+            loss_adj = F.cross_entropy(pred_adj, adj, reduce='mean', ignore_index=0)
             ret['loss_adj'] = loss_adj
 
         return ret
@@ -281,6 +283,7 @@ class VAE(pl.LightningModule):
     def get_kl_weights(self):
 
         max_epoch = self.training_configs.get('max_epoch', 100)
+        max_epoch = min([max_epoch, 100])
         max_kl_weights = float(self.training_configs.get('max_kl_weights', 1.0))
 
         return min([max_kl_weights*float(self.n_epoch)/max_epoch, max_kl_weights])
@@ -298,7 +301,7 @@ class VAE(pl.LightningModule):
                 is_valid = False
             if is_valid:
                 n_valid +=1
-        n_valid = int(float(n_valid)/n*100.0)
+        #n_valid = int(float(n_valid)/n*100.0)
         self.log("val/n_valid", n_valid)
         self.n_epoch +=1
 
@@ -594,9 +597,9 @@ def get_model(name: str,
 
         model = VAE(encoder, decoder, embedding,
                     generator,
-                    adj_predictor,
+                    None,
+                    #adj_predictor,
                     training_configs=configs)
         return model
-
 
 
