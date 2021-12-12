@@ -476,7 +476,9 @@ class VAE(pl.LightningModule):
         self.load_state_dict(state_dict)
 
 
-    def sample_neighbor(self, src: torch.Tensor, n: int, prefix = None):
+    def sample_neighbor(self, src: torch.Tensor, n: int, prefix = None,
+                        epsilon=1.0,
+                        is_gpu: bool = True):
         mask = (src!=0).unsqueeze(-2)  #[B,1,L]
         mu, logvar, mean, pred_len, out = self.encode(src, mask)
         #pred_len = torch.argmax(pred_len, dim=-1)
@@ -488,16 +490,29 @@ class VAE(pl.LightningModule):
             #eps = torch.rand_like(std)
             #y = std*eps
             #z = mu + y.cuda()
-            z = mu + torch.randn(self.latent_dim).cuda()
+            z = mu + torch.randn(self.latent_dim).to(mu.device)*epsilon
             #print(z[0,0:2])
             #z = mean
-            token = self.greedy_decode(z, mask, prefix)[-1]
+            token = self.greedy_decode(z, mask, prefix, is_gpu=is_gpu)[-1]
 
             ret.append(token.detach().cpu().numpy().tolist())
 
         return ret
 
+    def encode_latent(self, smiles: str, tokenizer: SmilesTokenizer,
+                      max_len: int,
+                      is_gpu = False):
+        #x = [tokenizer.ID_PAD] * max_len
+        x = tokenizer.smiles2ids(smiles, max_len)
 
+        x = torch.Tensor(x).long()
+        x = x.unsqueeze(0)
+        mask = make_std_mask(x, tokenizer.ID_PAD)
+        if is_gpu:
+            x = x.cuda()
+            mask = mask.cuda()
+        mu, logvar, mem, pred_len, out = self.encode(x, mask)
+        return mu
 
     def sample(self, n: int, tokenizer: SmilesTokenizer=None):
 

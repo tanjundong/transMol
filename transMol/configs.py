@@ -11,13 +11,13 @@ configs = {
     'n_heads': 1,
     'n_encode_layers': 12,
     'n_decode_layers': 4,
-    'max_kl_weights' : 10.0,
-    'max_epoch': 500,
+    'max_kl_weights' : 2.0,
+    'max_epoch': 200,
     'decoder': 'RNN',
     'decode_from_latent': True,
     'predict_adj': False,
     'batch_size': 16*16*2*int(len(gpus)),
-    'warmup_steps': 30000,
+    'warmup_steps': 10000,
 }
 configs['vocab_size'] = tokenizer.size
 
