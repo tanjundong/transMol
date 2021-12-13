@@ -186,7 +186,6 @@ class RNNDecoder(Decoder):
                  n_layers: int,
                  ):
         super().__init__()
-
         self.rnn = nn.GRU(
             hidden_dim, hidden_dim,
             n_layers, batch_first=True,
@@ -214,7 +213,7 @@ class RNNDecoder(Decoder):
         #x = torch.zeros_like(mem).to(mem.device)
         B,D = mem.shape
         L = self.max_len
-        x = torch.ones((B,L,D)).to(mem.device)
+        #x = torch.ones((B,L,D)).to(mem.device)
         h0 = mem.unsqueeze(0) #[1,B,D]
         h0 = torch.cat([h0]*self.n_layers, dim=0) #[NL, B, D]
         out,h = self.rnn(x, h0)

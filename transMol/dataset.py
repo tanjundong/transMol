@@ -87,30 +87,32 @@ class AutoRegressionDataset(Dataset):
         try:
             adj[0:num_atoms, 0:num_atoms] = am
         except:
-            print(num_atoms, self.max_len)
+            #print(num_atoms, self.max_len)
+            pass
         adj = torch.Tensor(adj).long() +1
 
 
 
-
+        m = 1
         ids = self.tokenizer.smiles2ids(smiles, self.max_len)
-        y = [self.tokenizer.ID_SOS] + ids[:-1]
+        y = [self.tokenizer.ID_SOS]*m + ids[:-m]
         l = len(ids)
         x = torch.LongTensor(ids)
         y = torch.LongTensor(y)
 
-        noise_x = x.clone()
         if self.is_denoising:
-            m = self.get_noise_mask(l)
-            noise_x = x.clone().masked_fill_(m, SmilesTokenizer.ID_MASK)
-            #y = torch.cat([self.tokenizer.ID_SOS], noise_x[:-1])
-            #y = torch.Tensor([self.tokenizer.ID_SOS]) + noise_x[:-1]
-            y = torch.cat((torch.Tensor([self.tokenizer.ID_SOS]), noise_x))
-            y = y[:-1]
-            y = y.long()
+            noise_smiles = ''
+            for i, s in enumerate(smiles):
+                if s in '0123456789[]()':
+                    noise_smiles += self.tokenizer.TOKEN_MASK
+                else:
+                    noise_smiles += s
 
+            noise_x = self.tokenizer.smiles2ids(noise_smiles, self.max_len)
+            noise_x = torch.LongTensor(noise_x)
 
-        #return noise_x, x, y
+        else:
+            noise_x = x.clone()
         return {
             'noise': noise_x,
             'src': x ,
@@ -211,7 +213,7 @@ class SmilesDataMudule(pl.LightningDataModule):
     def setup(self, stage=None):
 
         self.trainset = AutoRegressionDataset(self.train_path,
-                                              self.tokenizer, True, False, self.max_len)
+                                              self.tokenizer, True, True, self.max_len)
         self.validset = AutoRegressionDataset(self.val_path,
                                               self.tokenizer, True, False, self.max_len)
 

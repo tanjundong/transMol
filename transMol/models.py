@@ -196,7 +196,8 @@ class VAE(pl.LightningModule):
         noise = batch['noise']
         src = batch['src']
         tgt = batch['tgt']
-
+        noise = Variable(noise)
+        tgt = Variable(tgt)
         pad_idx = 0
         #src = Variable(src.long())
         #tgt = Variable(src.clone())
@@ -222,7 +223,7 @@ class VAE(pl.LightningModule):
 
         kl_weights = self.get_kl_weights()
         #loss_a_mim = loss_fn.KL_loss(mu, logvar, kl_weights)
-        loss_a_mim = loss_fn.loss_mmd(mu, kl_weights)
+        loss_a_mim = loss_fn.loss_mmd(mu, kl_weights)*10
         #print(logit.shape, src.shape)
         loss_bce = loss_fn.smiles_bce_loss(logit, src, pad_idx)
         loss_length = 0.0
@@ -281,7 +282,7 @@ class VAE(pl.LightningModule):
 
     def get_kl_weights(self):
 
-        max_epoch = self.training_configs.get('max_epoch', 100)
+        max_epoch = self.training_configs.get('max_kl_epoch', 100)
         max_kl_weights = float(self.training_configs.get('max_kl_weights', 1.0))
 
         return min([max_kl_weights*float(self.n_epoch)/max_epoch, max_kl_weights])
@@ -577,6 +578,7 @@ def get_model(name: str,
 
         decoder_type = configs.get('decoder','trans')
         if decoder_type == 'RNN':
+            print('use RNN decoder')
             decoder = RNNDecoder(
                 hidden_dim,
                 max_len,
@@ -595,7 +597,8 @@ def get_model(name: str,
 
         model = VAE(encoder, decoder, embedding,
                     generator,
-                    adj_predictor,
+                    #adj_predictor,
+                    None,
                     training_configs=configs)
         return model
 
